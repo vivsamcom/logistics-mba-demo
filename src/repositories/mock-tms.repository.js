@@ -1,0 +1,89 @@
+const seedDrivers = require('../data/seed/drivers.json');
+const seedShipments = require('../data/seed/shipments.json');
+const seedAssignments = require('../data/seed/assignments.json');
+const seedExceptions = require('../data/seed/exceptions.json');
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+let state;
+let nextExceptionNumber;
+
+function reset() {
+  state = {
+    drivers: clone(seedDrivers),
+    shipments: clone(seedShipments),
+    assignments: clone(seedAssignments),
+    exceptions: clone(seedExceptions)
+  };
+
+  nextExceptionNumber =
+    state.exceptions.reduce((highest, exception) => {
+      const match = /^EX-(\d+)$/.exec(exception.exceptionId);
+      return match ? Math.max(highest, Number(match[1])) : highest;
+    }, 0) + 1;
+}
+
+function getDrivers() {
+  return state.drivers;
+}
+
+function getDriverById(driverId) {
+  return state.drivers.find((driver) => driver.driverId === driverId);
+}
+
+function getShipments() {
+  return state.shipments;
+}
+
+function getShipmentById(shipmentId) {
+  return state.shipments.find(
+    (shipment) => shipment.shipmentId === shipmentId
+  );
+}
+
+function getAssignments() {
+  return state.assignments;
+}
+
+function getAssignmentByShipmentId(shipmentId) {
+  return state.assignments.find(
+    (assignment) => assignment.shipmentId === shipmentId
+  );
+}
+
+function createAssignment(assignment) {
+  state.assignments.push(assignment);
+  return assignment;
+}
+
+function getExceptions() {
+  return state.exceptions;
+}
+
+function createException(exception) {
+  const storedException = {
+    exceptionId: `EX-${String(nextExceptionNumber).padStart(3, '0')}`,
+    ...exception
+  };
+
+  nextExceptionNumber += 1;
+  state.exceptions.push(storedException);
+  return storedException;
+}
+
+reset();
+
+module.exports = {
+  reset,
+  getDrivers,
+  getDriverById,
+  getShipments,
+  getShipmentById,
+  getAssignments,
+  getAssignmentByShipmentId,
+  createAssignment,
+  getExceptions,
+  createException
+};

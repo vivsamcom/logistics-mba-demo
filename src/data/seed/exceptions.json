@@ -1,0 +1,12 @@
+[
+  {
+    "exceptionId": "EX-001",
+    "shipmentId": "SHP-1099",
+    "driverId": "DRV-305",
+    "type": "TRAFFIC_CONGESTION",
+    "reason": "Heavy traffic",
+    "location": "Near Bharuch",
+    "delayMinutes": 45,
+    "status": "ACTIVE"
+  }
+]

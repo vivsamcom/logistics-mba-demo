@@ -1,0 +1,26 @@
+[
+  {
+    "shipmentId": "SHP-1024",
+    "driverId": "DRV-101",
+    "status": "ACCEPTED",
+    "sequence": 1
+  },
+  {
+    "shipmentId": "SHP-1088",
+    "driverId": "DRV-101",
+    "status": "ASSIGNED",
+    "sequence": 2
+  },
+  {
+    "shipmentId": "SHP-1050",
+    "driverId": "DRV-304",
+    "status": "ACCEPTED",
+    "sequence": 1
+  },
+  {
+    "shipmentId": "SHP-1099",
+    "driverId": "DRV-305",
+    "status": "ACCEPTED",
+    "sequence": 1
+  }
+]

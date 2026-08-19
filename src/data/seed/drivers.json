@@ -1,0 +1,44 @@
+[
+  {
+    "driverId": "DRV-101",
+    "name": "Raj",
+    "phone": "+15550000101",
+    "status": "ON_TRIP",
+    "currentShipmentId": "SHP-1024",
+    "nextShipmentId": "SHP-1088"
+  },
+  {
+    "driverId": "DRV-203",
+    "name": "Amit",
+    "phone": "+15550000203",
+    "status": "AVAILABLE",
+    "availableFrom": "18:00",
+    "currentShipmentId": null,
+    "nextShipmentId": null
+  },
+  {
+    "driverId": "DRV-218",
+    "name": "Sunil",
+    "phone": "+15550000218",
+    "status": "AVAILABLE",
+    "availableFrom": "18:30",
+    "currentShipmentId": null,
+    "nextShipmentId": null
+  },
+  {
+    "driverId": "DRV-304",
+    "name": "Meera",
+    "phone": "+15550000304",
+    "status": "ON_TRIP",
+    "currentShipmentId": "SHP-1050",
+    "nextShipmentId": null
+  },
+  {
+    "driverId": "DRV-305",
+    "name": "Arjun",
+    "phone": "+15550000305",
+    "status": "ON_TRIP",
+    "currentShipmentId": "SHP-1099",
+    "nextShipmentId": null
+  }
+]

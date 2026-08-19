@@ -1,0 +1,72 @@
+[
+  {
+    "shipmentId": "SHP-1024",
+    "serviceDate": "2026-08-19",
+    "origin": "Mumbai",
+    "destination": "Bengaluru",
+    "pickupLocation": "Mumbai DC",
+    "pickupTime": "10:00",
+    "deliveryWindow": "17:00",
+    "driverId": "DRV-101",
+    "status": "IN_TRANSIT",
+    "originalEta": "17:00",
+    "eta": "17:00",
+    "delayMinutes": 0
+  },
+  {
+    "shipmentId": "SHP-1088",
+    "serviceDate": "2026-08-19",
+    "origin": "Bengaluru",
+    "destination": "Chennai",
+    "pickupLocation": "Bengaluru Logistics Park",
+    "pickupTime": "19:00",
+    "deliveryWindow": "05:00",
+    "driverId": "DRV-101",
+    "status": "SCHEDULED",
+    "originalEta": "05:00",
+    "eta": "05:00",
+    "delayMinutes": 0
+  },
+  {
+    "shipmentId": "SHP-1050",
+    "serviceDate": "2026-08-19",
+    "origin": "Delhi",
+    "destination": "Jaipur",
+    "pickupLocation": "Delhi North Hub",
+    "pickupTime": "08:00",
+    "deliveryWindow": "14:00",
+    "driverId": "DRV-304",
+    "status": "IN_TRANSIT",
+    "originalEta": "14:00",
+    "eta": "14:00",
+    "delayMinutes": 0
+  },
+  {
+    "shipmentId": "SHP-1092",
+    "serviceDate": "2026-08-19",
+    "origin": "Chennai",
+    "destination": "Hyderabad",
+    "pickupLocation": "Chennai Port",
+    "pickupTime": "15:00",
+    "deliveryWindow": "23:00",
+    "driverId": null,
+    "status": "SCHEDULED",
+    "originalEta": "23:00",
+    "eta": "23:00",
+    "delayMinutes": 0
+  },
+  {
+    "shipmentId": "SHP-1099",
+    "serviceDate": "2026-08-19",
+    "origin": "Ahmedabad",
+    "destination": "Surat",
+    "pickupLocation": "Ahmedabad DC",
+    "pickupTime": "12:00",
+    "deliveryWindow": "16:00",
+    "driverId": "DRV-305",
+    "status": "DELAYED",
+    "originalEta": "16:00",
+    "eta": "16:45",
+    "delayMinutes": 45
+  }
+]
