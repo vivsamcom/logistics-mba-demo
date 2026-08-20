@@ -63,7 +63,7 @@ test('Phase 1 webhook foundation', async (t) => {
     assert.equal(response.statusCode, 200);
     assert.deepEqual(JSON.parse(response.body), {
       status: 'UP',
-      service: 'by-tms-mba-demo'
+      service: 'logistics-mba-demo'
     });
   });
 

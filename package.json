@@ -1,7 +1,7 @@
 {
-  "name": "by-tms-mba-demo",
+  "name": "logistics-mba-demo",
   "version": "1.0.0",
-  "description": "Blue Yonder TMS and Meta Business Agent demo foundation",
+  "description": "Generic logistics and Meta Business Agent demo foundation",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

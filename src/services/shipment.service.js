@@ -1,4 +1,4 @@
-const repository = require('../repositories/mock-tms.repository');
+const repository = require('../repositories/mock-logistics.repository');
 const AppError = require('../utils/app-error');
 
 function requireShipment(shipmentId) {

@@ -3,6 +3,8 @@ const seedShipments = require('../data/seed/shipments.json');
 const seedAssignments = require('../data/seed/assignments.json');
 const seedExceptions = require('../data/seed/exceptions.json');
 
+// Mutable demo store that can later be replaced by a platform adapter.
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }

@@ -25,15 +25,15 @@ app.use(
 app.get('/health', (req, res) => {
   res.json({
     status: 'UP',
-    service: 'by-tms-mba-demo'
+    service: 'logistics-mba-demo'
   });
 });
 
 app.use('/webhook', webhookRoutes);
-app.use('/api/tms/shipments', shipmentRoutes);
-app.use('/api/tms/drivers', driverRoutes);
-app.use('/api/tms/assignments', assignmentRoutes);
-app.use('/api/tms/exceptions', exceptionRoutes);
+app.use('/api/shipments', shipmentRoutes);
+app.use('/api/drivers', driverRoutes);
+app.use('/api/assignments', assignmentRoutes);
+app.use('/api/exceptions', exceptionRoutes);
 app.use('/api/demo', demoRoutes);
 
 app.use(errorHandler);

@@ -1,12 +1,13 @@
-# by-tms-mba-demo
+# logistics-mba-demo
 
-`by-tms-mba-demo` is one Node.js/Express service for the agreed Blue Yonder
-TMS and Meta Business Agent QBR demo. It currently contains the WhatsApp
-Business Platform webhook foundation and a small, resettable mock TMS backend.
-Future outbound WhatsApp messaging and MBA connector tools will be added to
-this same application.
+`logistics-mba-demo` is a Node.js/Express service for a generic logistics and
+Meta Business Agent demo. It contains a WhatsApp Business Platform webhook
+foundation and a small, resettable mock transportation backend.
 
-This is a demo backend, not a reproduction of the Blue Yonder TMS product.
+The service represents a vendor-neutral integration boundary that could later
+connect to a transportation management system (TMS), fleet management system
+(FMS), carrier platform, shipment tracker, or another enterprise logistics
+system. It does not reproduce or claim to expose any vendor's product APIs.
 
 ## Current scope
 
@@ -16,36 +17,44 @@ This is a demo backend, not a reproduction of the Blue Yonder TMS product.
   validation
 - Mock drivers, shipments, assignments, and exceptions held in memory
 - Driver current-trip and assignment APIs
-- Dispatcher shipment summary, delayed-shipment, exception, impact, and
-  available-driver APIs
+- Shipment summary, delayed-shipment, exception, impact, and available-driver
+  APIs
 - Assignment response, exception reporting, and shipment reassignment actions
 - `POST /api/demo/reset` for repeatable rehearsals
 
-There is no real Blue Yonder connection, database, optimizer, queue, LLM, MBA
-configuration, or production persistence in this phase.
+There is no external logistics-platform connection, database, optimizer,
+queue, LLM, MBA configuration, or production persistence in this phase.
+Load tendering, carriers, vehicles, appointment scheduling, and tracking-event
+resources are not implemented in the current codebase.
 
-## Architecture
+## Architecture and integration boundary
 
 ```text
 WhatsApp Business Platform
           |
           | webhook / future Cloud API
           v
-+------------------------------------------------+
-| by-tms-mba-demo (one Express application)      |
-|                                                |
-| WhatsApp webhook                               |
-| Mock TMS routes -> services -> in-memory store |
-|                               ^                |
-|                               | reset/copy     |
-|                         JSON seed data         |
-| Future outbound WhatsApp and MBA tools         |
-+------------------------------------------------+
++----------------------------------------------------+
+| logistics-mba-demo (one Express application)      |
+|                                                    |
+| WhatsApp webhook                                   |
+| Logistics routes -> services -> in-memory store   |
+|                                  ^                 |
+|                                  | reset/copy      |
+|                            JSON seed data          |
++----------------------------------------------------+
 ```
 
 Routes contain HTTP mapping only. Controllers shape responses, services own
-validation and mock business behavior, and the repository owns mutable
+validation and demo business behavior, and the repository owns mutable
 in-memory state. Runtime changes are not written to the seed files.
+
+The HTTP and service layers use generic logistics concepts. A future adapter
+can replace the in-memory repository without changing the public API:
+
+```text
+Generic Logistics API -> platform adapter -> external logistics system
+```
 
 ## Install and run
 
@@ -83,7 +92,7 @@ WHATSAPP_BUSINESS_ACCOUNT_ID=
 ```
 
 Never commit `.env`. The WhatsApp access token and account/phone IDs remain
-placeholders for the future outbound messaging phase.
+placeholders for a future outbound messaging phase.
 
 ## API response conventions
 
@@ -99,27 +108,27 @@ Expected domain and validation errors use:
 }
 ```
 
-## Mock TMS APIs
+## Mock logistics APIs
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/api/tms/shipments/today` | Calculated demo-day summary |
-| GET | `/api/tms/shipments/delayed` | Current delayed shipments |
-| GET | `/api/tms/shipments/:shipmentId` | Shipment, driver, assignment, and exceptions |
-| GET | `/api/tms/shipments/:shipmentId/exceptions` | Shipment exception history |
-| POST | `/api/tms/shipments/:shipmentId/exceptions` | Record a driver-reported exception |
-| GET | `/api/tms/shipments/:shipmentId/impact` | Mock downstream risk supplied by the backend |
-| GET | `/api/tms/shipments/:shipmentId/available-drivers` | Mock TMS driver availability |
-| POST | `/api/tms/shipments/:shipmentId/reassign` | Perform a confirmed reassignment |
-| GET | `/api/tms/drivers/:driverId/current-trip` | Driver's current shipment context |
-| GET | `/api/tms/drivers/:driverId/assignments` | Ordered current/upcoming assignments |
-| POST | `/api/tms/assignments/:shipmentId/respond` | Accept or reject a pending assignment |
-| GET | `/api/tms/exceptions` | Active exceptions; supports `?status=ACTIVE` |
+| GET | `/api/shipments/today` | Calculated demo-day summary |
+| GET | `/api/shipments/delayed` | Current delayed shipments |
+| GET | `/api/shipments/:shipmentId` | Shipment, driver, assignment, and exceptions |
+| GET | `/api/shipments/:shipmentId/exceptions` | Shipment exception history |
+| POST | `/api/shipments/:shipmentId/exceptions` | Record a driver-reported exception |
+| GET | `/api/shipments/:shipmentId/impact` | Mock downstream risk supplied by the backend |
+| GET | `/api/shipments/:shipmentId/available-drivers` | Mock driver availability |
+| POST | `/api/shipments/:shipmentId/reassign` | Perform a confirmed reassignment |
+| GET | `/api/drivers/:driverId/current-trip` | Driver's current shipment context |
+| GET | `/api/drivers/:driverId/assignments` | Ordered current/upcoming assignments |
+| POST | `/api/assignments/:shipmentId/respond` | Accept or reject a pending assignment |
+| GET | `/api/exceptions` | Active exceptions; supports `?status=ACTIVE` |
 | POST | `/api/demo/reset` | Restore the original demo seed |
 
-The future MBA layer will understand language, gather missing information,
-confirm actions, and invoke these APIs. It will not calculate impact or driver
-availability itself.
+The future MBA layer can understand language, gather missing information,
+confirm actions, and invoke these APIs. It should obtain impact and driver
+availability from the backend rather than calculating them itself.
 
 ## Dataset and deterministic demo rules
 
@@ -143,14 +152,14 @@ The intentionally simple mock rules are:
 - A target shipment is impacted when the same driver's preceding assignment
   has an active delay. Delays of 60 minutes or more are `HIGH`; shorter delays
   are `MEDIUM`.
-- A driver is available when seed status is `AVAILABLE` and `availableFrom` is
-  no later than the shipment pickup time.
+- A driver is available when seed status is `AVAILABLE` and `availableFrom`
+  is no later than the shipment pickup time.
 - Reassignment updates the shipment, assignment, old driver, and new driver in
   one in-memory operation.
 - Exception reporting requires the supplied driver to be assigned to the
   shipment.
 
-## Complete QBR walkthrough
+## Complete demo walkthrough
 
 Start the app, then run the following commands in order.
 
@@ -163,19 +172,19 @@ curl -X POST http://localhost:3000/api/demo/reset
 2. Query Raj's current trip:
 
 ```bash
-curl http://localhost:3000/api/tms/drivers/DRV-101/current-trip
+curl http://localhost:3000/api/drivers/DRV-101/current-trip
 ```
 
 3. Query `SHP-1024`:
 
 ```bash
-curl http://localhost:3000/api/tms/shipments/SHP-1024
+curl http://localhost:3000/api/shipments/SHP-1024
 ```
 
 4. Report the vehicle breakdown near Pune with a 90-minute delay:
 
 ```bash
-curl -X POST http://localhost:3000/api/tms/shipments/SHP-1024/exceptions \
+curl -X POST http://localhost:3000/api/shipments/SHP-1024/exceptions \
   -H "Content-Type: application/json" \
   -d '{"driverId":"DRV-101","type":"VEHICLE_BREAKDOWN","reason":"Truck breakdown","location":"Near Pune","delayMinutes":90}'
 ```
@@ -183,13 +192,13 @@ curl -X POST http://localhost:3000/api/tms/shipments/SHP-1024/exceptions \
 5. Verify `SHP-1024` is now delayed with ETA `18:30`:
 
 ```bash
-curl http://localhost:3000/api/tms/shipments/SHP-1024
+curl http://localhost:3000/api/shipments/SHP-1024
 ```
 
 6. Query active exceptions:
 
 ```bash
-curl http://localhost:3000/api/tms/exceptions
+curl http://localhost:3000/api/exceptions
 ```
 
 The response contains the initial seed exception plus the new `EX-002`.
@@ -197,28 +206,28 @@ The response contains the initial seed exception plus the new `EX-002`.
 7. Query Raj's current and next assignments:
 
 ```bash
-curl http://localhost:3000/api/tms/drivers/DRV-101/assignments
+curl http://localhost:3000/api/drivers/DRV-101/assignments
 ```
 
-8. Ask the backend whether the delay impacts next shipment `SHP-1088`:
+8. Ask whether the delay impacts next shipment `SHP-1088`:
 
 ```bash
-curl http://localhost:3000/api/tms/shipments/SHP-1088/impact
+curl http://localhost:3000/api/shipments/SHP-1088/impact
 ```
 
-The mock TMS returns `impacted: true`, `risk: HIGH`, and identifies
-`SHP-1024` as the source.
+The backend returns `impacted: true`, `risk: HIGH`, and identifies `SHP-1024`
+as the source.
 
 9. Find available drivers for `SHP-1088`:
 
 ```bash
-curl http://localhost:3000/api/tms/shipments/SHP-1088/available-drivers
+curl http://localhost:3000/api/shipments/SHP-1088/available-drivers
 ```
 
 10. Reassign `SHP-1088` to Amit (`DRV-203`):
 
 ```bash
-curl -X POST http://localhost:3000/api/tms/shipments/SHP-1088/reassign \
+curl -X POST http://localhost:3000/api/shipments/SHP-1088/reassign \
   -H "Content-Type: application/json" \
   -d '{"newDriverId":"DRV-203"}'
 ```
@@ -226,8 +235,8 @@ curl -X POST http://localhost:3000/api/tms/shipments/SHP-1088/reassign \
 11. Verify the shipment and Amit's assignment:
 
 ```bash
-curl http://localhost:3000/api/tms/shipments/SHP-1088
-curl http://localhost:3000/api/tms/drivers/DRV-203/assignments
+curl http://localhost:3000/api/shipments/SHP-1088
+curl http://localhost:3000/api/drivers/DRV-203/assignments
 ```
 
 12. Reset again for the next rehearsal:
@@ -239,7 +248,7 @@ curl -X POST http://localhost:3000/api/demo/reset
 Optional pending-assignment response example after a reset:
 
 ```bash
-curl -X POST http://localhost:3000/api/tms/assignments/SHP-1088/respond \
+curl -X POST http://localhost:3000/api/assignments/SHP-1088/respond \
   -H "Content-Type: application/json" \
   -d '{"driverId":"DRV-101","response":"ACCEPT"}'
 ```
@@ -278,7 +287,7 @@ a legitimate Meta signature.
 
 ## Tests and deployment
 
-Run all webhook and mock TMS tests with:
+Run all webhook and mock logistics tests with:
 
 ```bash
 npm test
@@ -288,7 +297,7 @@ The service remains suitable for one future Render Web Service: it uses
 `process.env.PORT`, exposes `/health`, stores secrets in environment variables,
 does not hardcode its callback host, and does not write runtime state to disk.
 
-The next phase should add outbound WhatsApp Utility template notifications for
-assignment and exception events. MBA connector schemas/configuration can then
-map to the existing REST APIs without moving transportation decisions out of
-the mock TMS services.
+A future phase can add outbound WhatsApp Utility template notifications for
+assignment and exception events. MBA connector schemas/configuration can map
+to the generic REST APIs while transportation decisions remain in the backend
+or its future platform adapter.

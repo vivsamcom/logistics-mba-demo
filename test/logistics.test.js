@@ -61,7 +61,7 @@ function resetDemo(server) {
 function reportBreakdown(server) {
   return request(server, {
     method: 'POST',
-    path: '/api/tms/shipments/SHP-1024/exceptions',
+    path: '/api/shipments/SHP-1024/exceptions',
     body: {
       driverId: 'DRV-101',
       type: 'VEHICLE_BREAKDOWN',
@@ -75,12 +75,12 @@ function reportBreakdown(server) {
 function reassignToAmit(server) {
   return request(server, {
     method: 'POST',
-    path: '/api/tms/shipments/SHP-1088/reassign',
+    path: '/api/shipments/SHP-1088/reassign',
     body: { newDriverId: 'DRV-203' }
   });
 }
 
-test('mock TMS demo APIs', async (t) => {
+test('mock logistics demo APIs', async (t) => {
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => new Promise((resolve) => server.close(resolve)));
@@ -88,7 +88,7 @@ test('mock TMS demo APIs', async (t) => {
   await t.test('returns a calculated shipment summary', async () => {
     await resetDemo(server);
     const response = await request(server, {
-      path: '/api/tms/shipments/today'
+      path: '/api/shipments/today'
     });
 
     assert.equal(response.statusCode, 200);
@@ -105,7 +105,7 @@ test('mock TMS demo APIs', async (t) => {
   await t.test('gets an existing shipment with related data', async () => {
     await resetDemo(server);
     const response = await request(server, {
-      path: '/api/tms/shipments/SHP-1024'
+      path: '/api/shipments/SHP-1024'
     });
 
     assert.equal(response.statusCode, 200);
@@ -116,7 +116,7 @@ test('mock TMS demo APIs', async (t) => {
 
   await t.test('returns a structured 404 for an unknown shipment', async () => {
     const response = await request(server, {
-      path: '/api/tms/shipments/SHP-9999'
+      path: '/api/shipments/SHP-9999'
     });
 
     assert.equal(response.statusCode, 404);
@@ -131,7 +131,7 @@ test('mock TMS demo APIs', async (t) => {
   await t.test('returns delayed shipments from current state', async () => {
     await resetDemo(server);
     const response = await request(server, {
-      path: '/api/tms/shipments/delayed'
+      path: '/api/shipments/delayed'
     });
 
     assert.equal(response.statusCode, 200);
@@ -142,10 +142,10 @@ test('mock TMS demo APIs', async (t) => {
   await t.test('returns the driver current trip and ordered assignments', async () => {
     await resetDemo(server);
     const currentTrip = await request(server, {
-      path: '/api/tms/drivers/DRV-101/current-trip'
+      path: '/api/drivers/DRV-101/current-trip'
     });
     const assignments = await request(server, {
-      path: '/api/tms/drivers/DRV-101/assignments'
+      path: '/api/drivers/DRV-101/assignments'
     });
 
     assert.equal(currentTrip.statusCode, 200);
@@ -160,12 +160,12 @@ test('mock TMS demo APIs', async (t) => {
     await resetDemo(server);
     const accepted = await request(server, {
       method: 'POST',
-      path: '/api/tms/assignments/SHP-1088/respond',
+      path: '/api/assignments/SHP-1088/respond',
       body: { driverId: 'DRV-101', response: 'ACCEPT' }
     });
     const repeated = await request(server, {
       method: 'POST',
-      path: '/api/tms/assignments/SHP-1088/respond',
+      path: '/api/assignments/SHP-1088/respond',
       body: { driverId: 'DRV-101', response: 'REJECT' }
     });
 
@@ -182,13 +182,13 @@ test('mock TMS demo APIs', async (t) => {
     await resetDemo(server);
     const created = await reportBreakdown(server);
     const shipment = await request(server, {
-      path: '/api/tms/shipments/SHP-1024'
+      path: '/api/shipments/SHP-1024'
     });
     const shipmentExceptions = await request(server, {
-      path: '/api/tms/shipments/SHP-1024/exceptions'
+      path: '/api/shipments/SHP-1024/exceptions'
     });
     const activeExceptions = await request(server, {
-      path: '/api/tms/exceptions'
+      path: '/api/exceptions'
     });
 
     assert.equal(created.statusCode, 201);
@@ -206,7 +206,7 @@ test('mock TMS demo APIs', async (t) => {
     await resetDemo(server);
     await reportBreakdown(server);
     const response = await request(server, {
-      path: '/api/tms/shipments/SHP-1088/impact'
+      path: '/api/shipments/SHP-1088/impact'
     });
 
     assert.equal(response.statusCode, 200);
@@ -223,7 +223,7 @@ test('mock TMS demo APIs', async (t) => {
   await t.test('returns drivers available before the shipment pickup', async () => {
     await resetDemo(server);
     const response = await request(server, {
-      path: '/api/tms/shipments/SHP-1088/available-drivers'
+      path: '/api/shipments/SHP-1088/available-drivers'
     });
 
     assert.equal(response.statusCode, 200);
@@ -237,13 +237,13 @@ test('mock TMS demo APIs', async (t) => {
     await resetDemo(server);
     const reassignment = await reassignToAmit(server);
     const shipment = await request(server, {
-      path: '/api/tms/shipments/SHP-1088'
+      path: '/api/shipments/SHP-1088'
     });
     const amitAssignments = await request(server, {
-      path: '/api/tms/drivers/DRV-203/assignments'
+      path: '/api/drivers/DRV-203/assignments'
     });
     const rajAssignments = await request(server, {
-      path: '/api/tms/drivers/DRV-101/assignments'
+      path: '/api/drivers/DRV-101/assignments'
     });
 
     assert.equal(reassignment.statusCode, 200);
@@ -268,16 +268,16 @@ test('mock TMS demo APIs', async (t) => {
 
     const reset = await resetDemo(server);
     const currentShipment = await request(server, {
-      path: '/api/tms/shipments/SHP-1024'
+      path: '/api/shipments/SHP-1024'
     });
     const nextShipment = await request(server, {
-      path: '/api/tms/shipments/SHP-1088'
+      path: '/api/shipments/SHP-1088'
     });
     const exceptions = await request(server, {
-      path: '/api/tms/shipments/SHP-1024/exceptions'
+      path: '/api/shipments/SHP-1024/exceptions'
     });
     const availableDrivers = await request(server, {
-      path: '/api/tms/shipments/SHP-1088/available-drivers'
+      path: '/api/shipments/SHP-1088/available-drivers'
     });
 
     assert.equal(reset.statusCode, 200);

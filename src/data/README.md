@@ -1,4 +1,4 @@
-# Mock TMS seed data
+# Mock logistics seed data
 
 The `seed` directory contains the small, fictional, deterministic dataset used
 by the QBR demo. The in-memory repository deep-copies these files at startup
