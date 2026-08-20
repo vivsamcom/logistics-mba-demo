@@ -1,7 +1,7 @@
 [
   {
     "shipmentId": "SHP-1024",
-    "serviceDate": "2026-08-19",
+    "serviceDate": null,
     "origin": "Mumbai",
     "destination": "Bengaluru",
     "pickupLocation": "Mumbai DC",
@@ -15,7 +15,7 @@
   },
   {
     "shipmentId": "SHP-1088",
-    "serviceDate": "2026-08-19",
+    "serviceDate": null,
     "origin": "Bengaluru",
     "destination": "Chennai",
     "pickupLocation": "Bengaluru Logistics Park",
@@ -29,7 +29,7 @@
   },
   {
     "shipmentId": "SHP-1050",
-    "serviceDate": "2026-08-19",
+    "serviceDate": null,
     "origin": "Delhi",
     "destination": "Jaipur",
     "pickupLocation": "Delhi North Hub",
@@ -43,7 +43,7 @@
   },
   {
     "shipmentId": "SHP-1092",
-    "serviceDate": "2026-08-19",
+    "serviceDate": null,
     "origin": "Chennai",
     "destination": "Hyderabad",
     "pickupLocation": "Chennai Port",
@@ -57,7 +57,7 @@
   },
   {
     "shipmentId": "SHP-1099",
-    "serviceDate": "2026-08-19",
+    "serviceDate": null,
     "origin": "Ahmedabad",
     "destination": "Surat",
     "pickupLocation": "Ahmedabad DC",

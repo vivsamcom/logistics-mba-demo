@@ -112,7 +112,7 @@ Expected domain and validation errors use:
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/api/shipments/today` | Calculated demo-day summary |
+| GET | `/api/shipments/today` | Current system-date summary |
 | GET | `/api/shipments/delayed` | Current delayed shipments |
 | GET | `/api/shipments/:shipmentId` | Shipment, driver, assignment, and exceptions |
 | GET | `/api/shipments/:shipmentId/exceptions` | Shipment exception history |
@@ -140,9 +140,11 @@ dummy phone numbers. It includes:
 - Two scheduled, two in-transit, and one delayed shipment
 - One initial active exception on `SHP-1099`
 
-All shipments belong to the fixed seed operating date `2026-08-19`; "today"
-means that demo operating date so rehearsals do not change with the system
-clock. Summary counts are calculated from current in-memory state.
+Seed shipments are stamped in memory with the server's current local system
+date at startup and reset. A long-running process also refreshes shipment dates
+after local midnight. The JSON seed keeps `serviceDate` as `null`, and runtime
+changes are not written back to it. Summary counts are calculated from current
+in-memory state.
 
 The intentionally simple mock rules are:
 

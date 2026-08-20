@@ -11,6 +11,29 @@ function clone(value) {
 
 let state;
 let nextExceptionNumber;
+let operatingDate;
+
+function getSystemDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function synchronizeShipmentDates() {
+  const systemDate = getSystemDate();
+
+  if (operatingDate === systemDate) {
+    return;
+  }
+
+  state.shipments.forEach((shipment) => {
+    shipment.serviceDate = systemDate;
+  });
+  operatingDate = systemDate;
+}
 
 function reset() {
   state = {
@@ -19,6 +42,8 @@ function reset() {
     assignments: clone(seedAssignments),
     exceptions: clone(seedExceptions)
   };
+  operatingDate = null;
+  synchronizeShipmentDates();
 
   nextExceptionNumber =
     state.exceptions.reduce((highest, exception) => {
@@ -36,10 +61,12 @@ function getDriverById(driverId) {
 }
 
 function getShipments() {
+  synchronizeShipmentDates();
   return state.shipments;
 }
 
 function getShipmentById(shipmentId) {
+  synchronizeShipmentDates();
   return state.shipments.find(
     (shipment) => shipment.shipmentId === shipmentId
   );

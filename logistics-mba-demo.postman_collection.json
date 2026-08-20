@@ -1,0 +1,310 @@
+{
+  "info": {
+    "_postman_id": "8ee5c754-8ec0-4b61-a81c-41bd12cdfdfa",
+    "name": "Logistics MBA Demo",
+    "description": "Complete local API collection for the logistics demo. Start the service with npm start, then run Demo Reset before replaying mutation scenarios.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "shipmentId",
+      "value": "SHP-1024"
+    },
+    {
+      "key": "nextShipmentId",
+      "value": "SHP-1088"
+    },
+    {
+      "key": "driverId",
+      "value": "DRV-101"
+    },
+    {
+      "key": "newDriverId",
+      "value": "DRV-203"
+    },
+    {
+      "key": "verifyToken",
+      "value": "replace-with-WEBHOOK_VERIFY_TOKEN"
+    }
+  ],
+  "item": [
+    {
+      "name": "Setup and Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": "Checks whether the Express service is running."
+          }
+        },
+        {
+          "name": "Demo Reset",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/demo/reset",
+            "description": "Restores all in-memory drivers, shipments, assignments, and exceptions from the JSON seed files."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shipments",
+      "item": [
+        {
+          "name": "Today's Shipment Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/today",
+            "description": "Returns summary counts for the server's current local system date."
+          }
+        },
+        {
+          "name": "Delayed Shipments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/delayed"
+          }
+        },
+        {
+          "name": "Shipment Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/{{shipmentId}}",
+            "description": "Returns the shipment plus its current driver, assignment, and exceptions."
+          }
+        },
+        {
+          "name": "Shipment Exception History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/{{shipmentId}}/exceptions"
+          }
+        },
+        {
+          "name": "Report Shipment Exception",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverId\": \"{{driverId}}\",\n  \"type\": \"VEHICLE_BREAKDOWN\",\n  \"reason\": \"Truck breakdown\",\n  \"location\": \"Near Pune\",\n  \"delayMinutes\": 90\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/shipments/{{shipmentId}}/exceptions",
+            "description": "driverId, type, and delayMinutes are required. delayMinutes must be a non-negative integer; reason and location are optional. The driver must be assigned to the shipment."
+          }
+        },
+        {
+          "name": "Next Shipment Impact",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/{{nextShipmentId}}/impact",
+            "description": "After reporting a delay on SHP-1024, this shows its effect on Raj's next shipment, SHP-1088."
+          }
+        },
+        {
+          "name": "Available Drivers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/{{nextShipmentId}}/available-drivers"
+          }
+        },
+        {
+          "name": "Reassign Shipment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newDriverId\": \"{{newDriverId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/shipments/{{nextShipmentId}}/reassign",
+            "description": "The new driver must exist and be AVAILABLE no later than the shipment pickup time. DRV-203 and DRV-218 work for SHP-1088 immediately after reset."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Drivers and Assignments",
+      "item": [
+        {
+          "name": "Driver Current Trip",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/drivers/{{driverId}}/current-trip"
+          }
+        },
+        {
+          "name": "Driver Assignments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/drivers/{{driverId}}/assignments"
+          }
+        },
+        {
+          "name": "Accept Pending Assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverId\": \"{{driverId}}\",\n  \"response\": \"ACCEPT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/assignments/{{nextShipmentId}}/respond",
+            "description": "Run Demo Reset first. response accepts ACCEPT or REJECT (case-insensitive), and the assignment must still be in ASSIGNED state."
+          }
+        },
+        {
+          "name": "Reject Pending Assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverId\": \"{{driverId}}\",\n  \"response\": \"REJECT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/assignments/{{nextShipmentId}}/respond",
+            "description": "Run Demo Reset first. Rejecting removes the driver from the shipment and updates driver availability where applicable."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Exceptions",
+      "item": [
+        {
+          "name": "Active Exceptions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/exceptions?status=ACTIVE",
+            "description": "status is optional and defaults to ACTIVE. Allowed values are ACTIVE and RESOLVED, case-insensitive."
+          }
+        },
+        {
+          "name": "Resolved Exceptions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/exceptions?status=RESOLVED"
+          }
+        }
+      ]
+    },
+    {
+      "name": "WhatsApp Webhook",
+      "item": [
+        {
+          "name": "Verify Webhook",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/webhook?hub.mode=subscribe&hub.verify_token={{verifyToken}}&hub.challenge=123456",
+            "description": "Set verifyToken to exactly the WEBHOOK_VERIFY_TOKEN value in .env. A match returns the challenge as plain text; otherwise the API returns 403."
+          }
+        },
+        {
+          "name": "Receive Empty WhatsApp Callback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/webhook",
+            "description": "Works unsigned while META_SIGNATURE_VALIDATION_ENABLED=false. If validation is enabled, send X-Hub-Signature-256: sha256=<HMAC-SHA256 of the exact raw request body using META_APP_SECRET>."
+          }
+        },
+        {
+          "name": "Receive WhatsApp Text Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [\n    {\n      \"id\": \"WHATSAPP_BUSINESS_ACCOUNT_ID\",\n      \"changes\": [\n        {\n          \"field\": \"messages\",\n          \"value\": {\n            \"messaging_product\": \"whatsapp\",\n            \"metadata\": {\n              \"display_phone_number\": \"15550000000\",\n              \"phone_number_id\": \"PHONE_NUMBER_ID\"\n            },\n            \"contacts\": [\n              {\n                \"profile\": {\n                  \"name\": \"Raj\"\n                },\n                \"wa_id\": \"15550000101\"\n              }\n            ],\n            \"messages\": [\n              {\n                \"from\": \"15550000101\",\n                \"id\": \"wamid.demo-message-1\",\n                \"timestamp\": \"1787126400\",\n                \"text\": {\n                  \"body\": \"My truck broke down near Pune\"\n                },\n                \"type\": \"text\"\n              }\n            ]\n          }\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/webhook",
+            "description": "This phase only normalizes and logs the event; it does not call the logistics APIs or send a WhatsApp reply. Keep signature validation disabled for this hand-authored local payload."
+          }
+        }
+      ]
+    }
+  ]
+}

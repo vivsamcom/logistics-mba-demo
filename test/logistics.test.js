@@ -58,6 +58,15 @@ function resetDemo(server) {
   });
 }
 
+function getSystemDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
 function reportBreakdown(server) {
   return request(server, {
     method: 'POST',
@@ -93,7 +102,7 @@ test('mock logistics demo APIs', async (t) => {
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.body.data, {
-      operatingDate: '2026-08-19',
+      operatingDate: getSystemDate(),
       total: 5,
       scheduled: 2,
       inTransit: 2,
@@ -110,6 +119,7 @@ test('mock logistics demo APIs', async (t) => {
 
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.data.shipmentId, 'SHP-1024');
+    assert.equal(response.body.data.serviceDate, getSystemDate());
     assert.equal(response.body.data.driver.driverId, 'DRV-101');
     assert.equal(response.body.data.assignment.status, 'ACCEPTED');
   });
