@@ -5,13 +5,14 @@ by the QBR demo. The in-memory repository deep-copies these files at startup
 and whenever `POST /api/demo/reset` is called.
 
 Shipment `serviceDate` values are deliberately `null` in the seed. The
-repository stamps them with the server's current local system date in memory
-and refreshes them after local midnight.
+repository stamps them with the server's current local system date in memory,
+derives `expectedDeliveryDate` using `expectedDeliveryDayOffset`, and refreshes
+both dates after local midnight.
 
-`serviceDate` is an operating date, while `pickupTime` is a local appointment
-time used by the demo availability rule. They remain separate until an
-upstream system supplies a timezone-aware `pickupAt` value. A future migration
-should prefer an ISO 8601 timestamp with an explicit offset and retain
+`serviceDate` is an operating date, while `pickupTime` and `eta` are local
+appointment times. These local values remain separate until an upstream system
+supplies timezone-aware `pickupAt` and `expectedDeliveryAt` values. A future
+migration should prefer ISO 8601 timestamps with explicit offsets and retain
 `serviceDate` only when it has separate business meaning.
 
 Runtime changes are never written back to these JSON files. This makes reset

@@ -163,8 +163,8 @@ Trying to overwrite an active assignment returns
 `SHIPMENT_ALREADY_ASSIGNED`; use the existing reassignment API for that
 operation.
 
-The response contains the stored event and the updated assignment, shipment,
-and driver. For example, the event portion is:
+The response contains the stored event, updated assignment, shipment, driver,
+and a notification-ready payload. For example:
 
 ```json
 {
@@ -176,10 +176,70 @@ and driver. For example, the event portion is:
       "shipmentId": "SHP-1092",
       "driverId": "DRV-203",
       "occurredAt": "2026-08-21T10:30:00.000Z"
+    },
+    "notification": {
+      "channel": "WHATSAPP",
+      "recipient": {
+        "driverId": "DRV-203",
+        "phone": "+15550000203"
+      },
+      "template": {
+        "name": "new_load_assignment_v1",
+        "category": "UTILITY",
+        "language": "en_US",
+        "bodyParameters": [
+          { "position": 1, "name": "shipment", "value": "SHP-1092" },
+          { "position": 2, "name": "pickup", "value": "Chennai Port" },
+          { "position": 3, "name": "delivery", "value": "Hyderabad Distribution Center" },
+          { "position": 4, "name": "pickupDateTime", "value": "21 Aug, 3:00 PM" },
+          { "position": 5, "name": "expectedDeliveryDateTime", "value": "21 Aug, 11:00 PM" }
+        ],
+        "buttons": [
+          {
+            "index": 0,
+            "type": "QUICK_REPLY",
+            "text": "Accept",
+            "action": "ACCEPT",
+            "payload": "ASSIGNMENT:ACCEPT:SHP-1092:DRV-203"
+          },
+          {
+            "index": 1,
+            "type": "QUICK_REPLY",
+            "text": "Reject",
+            "action": "REJECT",
+            "payload": "ASSIGNMENT:REJECT:SHP-1092:DRV-203"
+          }
+        ]
+      }
     }
   }
 }
 ```
+
+The parameter positions map directly to the utility template:
+
+```text
+New shipment assigned
+
+Shipment {{1}} has been assigned to you.
+
+Pickup: {{2}}
+Delivery: {{3}}
+Pickup Date & Time: {{4}}
+Expected Delivery Date & Time: {{5}}
+
+Please review and confirm the assignment.
+
+Quick Reply buttons (configured separately from the body):
+1. Accept
+2. Reject
+```
+
+The service validates the driver's phone number and all five body parameter
+values before changing assignment state. Button payloads include the action,
+shipment ID, and driver ID needed to correlate a future webhook reply. The
+future WhatsApp adapter will still need to map this object to Meta's wire
+format, send it with the configured credentials, and process the callback.
 
 Assignment event records are in memory and are cleared by
 `POST /api/demo/reset`. The caller is treated as the assignment
@@ -189,18 +249,21 @@ shipments or two next shipments.
 
 ## Shipment date and time model
 
-The current model intentionally keeps `serviceDate` and `pickupTime` separate:
+The current model intentionally keeps local dates and times separate:
 
 - `serviceDate` is the business operating date used by the daily summary and
   resettable demo dataset.
 - `pickupTime` is the local appointment time in `HH:mm` format and is used by
   the current driver-availability rule.
+- `expectedDeliveryDate` is calculated in memory from the service date and
+  the seed's demo-only `expectedDeliveryDayOffset`.
+- `eta` supplies the expected delivery time in `HH:mm` format.
 
 They should not be replaced with a generated `pickupAt` yet. The current data
 does not include an IANA timezone or UTC offset, so a generated timestamp
 would be ambiguous outside the server's local timezone and would duplicate
-the existing fields. The notification layer can combine and format the two
-values for the current single-timezone demo.
+the existing fields. The notification payload formats the local values as
+`D MMM, h:mm AM/PM` for the current single-timezone demo.
 
 When the upstream system supplies timezone-aware timestamps, the preferred
 migration is to store one canonical ISO 8601 value such as

@@ -22,6 +22,12 @@ function getSystemDate() {
   return `${year}-${month}-${day}`;
 }
 
+function addDays(dateText, days) {
+  const date = new Date(`${dateText}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 function synchronizeShipmentDates() {
   const systemDate = getSystemDate();
 
@@ -31,6 +37,10 @@ function synchronizeShipmentDates() {
 
   state.shipments.forEach((shipment) => {
     shipment.serviceDate = systemDate;
+    shipment.expectedDeliveryDate = addDays(
+      systemDate,
+      shipment.expectedDeliveryDayOffset || 0
+    );
   });
   operatingDate = systemDate;
 }

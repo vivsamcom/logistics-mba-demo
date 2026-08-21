@@ -9,7 +9,8 @@ function createAssignment(req, res) {
       event: result.event,
       assignment: result.assignment,
       shipment: result.shipment,
-      driver: result.driver
+      driver: result.driver,
+      notification: result.notification
     }
   });
 }

@@ -20,6 +20,153 @@ function requireText(input, fieldName) {
   return value.trim();
 }
 
+function requireNotificationText(value, fieldName) {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new AppError(
+      422,
+      'ASSIGNMENT_NOTIFICATION_DATA_INCOMPLETE',
+      `${fieldName} is required to build the load assignment notification`
+    );
+  }
+
+  return value.trim();
+}
+
+function formatNotificationDateTime(
+  dateValue,
+  timeValue,
+  dateFieldName,
+  timeFieldName
+) {
+  const dateText = requireNotificationText(dateValue, dateFieldName);
+  const timeText = requireNotificationText(timeValue, timeFieldName);
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText);
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(timeText);
+
+  if (!dateMatch || !timeMatch) {
+    throw new AppError(
+      422,
+      'ASSIGNMENT_NOTIFICATION_DATA_INCOMPLETE',
+      `${dateFieldName} and ${timeFieldName} must use YYYY-MM-DD and HH:mm formats`
+    );
+  }
+
+  const year = Number(dateMatch[1]);
+  const month = Number(dateMatch[2]);
+  const day = Number(dateMatch[3]);
+  const hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day ||
+    hour > 23 ||
+    minute > 59
+  ) {
+    throw new AppError(
+      422,
+      'ASSIGNMENT_NOTIFICATION_DATA_INCOMPLETE',
+      `${dateFieldName} or ${timeFieldName} is not a valid date or time`
+    );
+  }
+
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
+  ];
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+
+  return `${day} ${months[month - 1]}, ${displayHour}:${String(minute).padStart(2, '0')} ${period}`;
+}
+
+function buildAssignmentNotification(shipment, driver) {
+  const shipmentId = requireNotificationText(
+    shipment && shipment.shipmentId,
+    'shipment.shipmentId'
+  );
+  const pickupLocation = requireNotificationText(
+    shipment && shipment.pickupLocation,
+    'shipment.pickupLocation'
+  );
+  const deliveryLocation = requireNotificationText(
+    shipment && shipment.deliveryLocation,
+    'shipment.deliveryLocation'
+  );
+  const pickupDateTime = formatNotificationDateTime(
+    shipment && shipment.serviceDate,
+    shipment && shipment.pickupTime,
+    'shipment.serviceDate',
+    'shipment.pickupTime'
+  );
+  const expectedDeliveryDateTime = formatNotificationDateTime(
+    shipment && shipment.expectedDeliveryDate,
+    shipment && shipment.eta,
+    'shipment.expectedDeliveryDate',
+    'shipment.eta'
+  );
+  const recipientPhone = requireNotificationText(
+    driver && driver.phone,
+    'driver.phone'
+  );
+
+  return {
+    channel: 'WHATSAPP',
+    recipient: {
+      driverId: driver.driverId,
+      phone: recipientPhone
+    },
+    template: {
+      name: 'new_load_assignment_v1',
+      category: 'UTILITY',
+      language: 'en_US',
+      bodyParameters: [
+        { position: 1, name: 'shipment', value: shipmentId },
+        { position: 2, name: 'pickup', value: pickupLocation },
+        { position: 3, name: 'delivery', value: deliveryLocation },
+        {
+          position: 4,
+          name: 'pickupDateTime',
+          value: pickupDateTime
+        },
+        {
+          position: 5,
+          name: 'expectedDeliveryDateTime',
+          value: expectedDeliveryDateTime
+        }
+      ],
+      buttons: [
+        {
+          index: 0,
+          type: 'QUICK_REPLY',
+          text: 'Accept',
+          action: 'ACCEPT',
+          payload: `ASSIGNMENT:ACCEPT:${shipmentId}:${driver.driverId}`
+        },
+        {
+          index: 1,
+          type: 'QUICK_REPLY',
+          text: 'Reject',
+          action: 'REJECT',
+          payload: `ASSIGNMENT:REJECT:${shipmentId}:${driver.driverId}`
+        }
+      ]
+    }
+  };
+}
+
 function getAssignmentSequence(driverId) {
   return repository
     .getAssignments()
@@ -70,12 +217,16 @@ function applyDriverAssignment(driver, shipment) {
 }
 
 function buildCreateResult(event, created) {
+  const shipment = repository.getShipmentById(event.shipmentId);
+  const driver = repository.getDriverById(event.driverId);
+
   return {
     created,
     event,
     assignment: repository.getAssignmentByShipmentId(event.shipmentId),
-    shipment: repository.getShipmentById(event.shipmentId),
-    driver: repository.getDriverById(event.driverId)
+    shipment,
+    driver,
+    notification: buildAssignmentNotification(shipment, driver)
   };
 }
 
@@ -140,6 +291,10 @@ function createAssignment(input) {
 
   requireAvailableAssignmentSlot(driver, shipment);
 
+  // Validate every value needed by the future outbound adapter before
+  // mutating assignment state.
+  const notification = buildAssignmentNotification(shipment, driver);
+
   const occurredAt = new Date().toISOString();
   const sequence = getAssignmentSequence(driverId);
 
@@ -174,7 +329,8 @@ function createAssignment(input) {
     event,
     assignment,
     shipment,
-    driver
+    driver,
+    notification
   };
 }
 

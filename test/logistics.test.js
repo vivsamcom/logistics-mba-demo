@@ -7,6 +7,7 @@ process.env.NODE_ENV = 'test';
 process.env.META_SIGNATURE_VALIDATION_ENABLED = 'false';
 
 const app = require('../src/app');
+const repository = require('../src/repositories/mock-logistics.repository');
 
 function request(server, { method = 'GET', path = '/', body }) {
   const address = server.address();
@@ -65,6 +66,34 @@ function getSystemDate() {
   const day = String(now.getDate()).padStart(2, '0');
 
   return `${year}-${month}-${day}`;
+}
+
+function addDays(dateText, days) {
+  const date = new Date(`${dateText}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatTemplateDateTime(dateText, timeText) {
+  const [, month, day] = dateText.split('-').map(Number);
+  const [hour, minute] = timeText.split(':').map(Number);
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
+  ];
+  const period = hour >= 12 ? 'PM' : 'AM';
+
+  return `${day} ${months[month - 1]}, ${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${period}`;
 }
 
 function reportBreakdown(server) {
@@ -133,6 +162,14 @@ test('mock logistics demo APIs', async (t) => {
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.data.shipmentId, 'SHP-1024');
     assert.equal(response.body.data.serviceDate, getSystemDate());
+    assert.equal(
+      response.body.data.expectedDeliveryDate,
+      addDays(getSystemDate(), 2)
+    );
+    assert.equal(
+      response.body.data.deliveryLocation,
+      'Bengaluru Warehouse'
+    );
     assert.equal(response.body.data.driver.driverId, 'DRV-101');
     assert.equal(response.body.data.assignment.status, 'ACCEPTED');
   });
@@ -217,6 +254,57 @@ test('mock logistics demo APIs', async (t) => {
     assert.equal(created.body.data.event.type, 'LOAD_ASSIGNED');
     assert.equal(created.body.data.assignment.status, 'ASSIGNED');
     assert.equal(created.body.data.assignment.driverId, 'DRV-203');
+    assert.deepEqual(created.body.data.notification, {
+      channel: 'WHATSAPP',
+      recipient: {
+        driverId: 'DRV-203',
+        phone: '+15550000203'
+      },
+      template: {
+        name: 'new_load_assignment_v1',
+        category: 'UTILITY',
+        language: 'en_US',
+        bodyParameters: [
+          { position: 1, name: 'shipment', value: 'SHP-1092' },
+          {
+            position: 2,
+            name: 'pickup',
+            value: 'Chennai Port'
+          },
+          {
+            position: 3,
+            name: 'delivery',
+            value: 'Hyderabad Distribution Center'
+          },
+          {
+            position: 4,
+            name: 'pickupDateTime',
+            value: formatTemplateDateTime(getSystemDate(), '15:00')
+          },
+          {
+            position: 5,
+            name: 'expectedDeliveryDateTime',
+            value: formatTemplateDateTime(getSystemDate(), '23:00')
+          }
+        ],
+        buttons: [
+          {
+            index: 0,
+            type: 'QUICK_REPLY',
+            text: 'Accept',
+            action: 'ACCEPT',
+            payload: 'ASSIGNMENT:ACCEPT:SHP-1092:DRV-203'
+          },
+          {
+            index: 1,
+            type: 'QUICK_REPLY',
+            text: 'Reject',
+            action: 'REJECT',
+            payload: 'ASSIGNMENT:REJECT:SHP-1092:DRV-203'
+          }
+        ]
+      }
+    });
     assert.match(
       created.body.data.assignment.assignedAt,
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/
@@ -241,6 +329,10 @@ test('mock logistics demo APIs', async (t) => {
     assert.equal(created.statusCode, 201);
     assert.equal(retried.statusCode, 200);
     assert.equal(retried.body.data.idempotent, true);
+    assert.deepEqual(
+      retried.body.data.notification,
+      created.body.data.notification
+    );
     assert.equal(driverAssignments.body.count, 1);
   });
 
@@ -286,6 +378,27 @@ test('mock logistics demo APIs', async (t) => {
         message: 'eventId is required'
       }
     });
+  });
+
+  await t.test('does not assign a load with incomplete notification data', async () => {
+    await resetDemo(server);
+    repository.getShipmentById('SHP-1092').pickupLocation = null;
+
+    const response = await createLoadAssignment(server);
+    const shipment = await request(server, {
+      path: '/api/shipments/SHP-1092'
+    });
+
+    assert.equal(response.statusCode, 422);
+    assert.deepEqual(response.body, {
+      error: {
+        code: 'ASSIGNMENT_NOTIFICATION_DATA_INCOMPLETE',
+        message:
+          'shipment.pickupLocation is required to build the load assignment notification'
+      }
+    });
+    assert.equal(shipment.body.data.driverId, null);
+    assert.equal(shipment.body.data.assignment, null);
   });
 
   await t.test('records a breakdown and updates shipment and exception views', async () => {
