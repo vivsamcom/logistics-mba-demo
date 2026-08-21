@@ -1,5 +1,19 @@
 const assignmentService = require('../services/assignment.service');
 
+function createAssignment(req, res) {
+  const result = assignmentService.createAssignment(req.body);
+
+  return res.status(result.created ? 201 : 200).json({
+    data: {
+      idempotent: !result.created,
+      event: result.event,
+      assignment: result.assignment,
+      shipment: result.shipment,
+      driver: result.driver
+    }
+  });
+}
+
 function respondToAssignment(req, res) {
   return res.json({
     data: assignmentService.respondToAssignment(
@@ -10,5 +24,6 @@ function respondToAssignment(req, res) {
 }
 
 module.exports = {
+  createAssignment,
   respondToAssignment
 };

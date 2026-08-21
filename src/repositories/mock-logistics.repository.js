@@ -40,7 +40,8 @@ function reset() {
     drivers: clone(seedDrivers),
     shipments: clone(seedShipments),
     assignments: clone(seedAssignments),
-    exceptions: clone(seedExceptions)
+    exceptions: clone(seedExceptions),
+    assignmentEvents: []
   };
   operatingDate = null;
   synchronizeShipmentDates();
@@ -87,6 +88,17 @@ function createAssignment(assignment) {
   return assignment;
 }
 
+function getAssignmentEventById(eventId) {
+  return state.assignmentEvents.find(
+    (event) => event.eventId === eventId
+  );
+}
+
+function createAssignmentEvent(event) {
+  state.assignmentEvents.push(event);
+  return event;
+}
+
 function getExceptions() {
   return state.exceptions;
 }
@@ -113,6 +125,8 @@ module.exports = {
   getAssignments,
   getAssignmentByShipmentId,
   createAssignment,
+  getAssignmentEventById,
+  createAssignmentEvent,
   getExceptions,
   createException
 };

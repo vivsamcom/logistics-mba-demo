@@ -4,6 +4,7 @@ const routeHandler = require('../middleware/route-handler');
 
 const router = express.Router();
 
+router.post('/', routeHandler(controller.createAssignment));
 router.post(
   '/:shipmentId/respond',
   routeHandler(controller.respondToAssignment)

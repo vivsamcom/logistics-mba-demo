@@ -15,7 +15,9 @@ system. It does not reproduce or claim to expose any vendor's product APIs.
 - `GET /webhook` Meta webhook verification
 - `POST /webhook` WhatsApp callback handling with optional raw-body signature
   validation
-- Mock drivers, shipments, assignments, and exceptions held in memory
+- Mock drivers, shipments, assignment events, and exceptions
+  held in memory
+- Idempotent load-assignment creation
 - Driver current-trip and assignment APIs
 - Shipment summary, delayed-shipment, exception, impact, and available-driver
   APIs
@@ -123,12 +125,88 @@ Expected domain and validation errors use:
 | GET | `/api/drivers/:driverId/current-trip` | Driver's current shipment context |
 | GET | `/api/drivers/:driverId/assignments` | Ordered current/upcoming assignments |
 | POST | `/api/assignments/:shipmentId/respond` | Accept or reject a pending assignment |
+| POST | `/api/assignments` | Create a new load assignment |
 | GET | `/api/exceptions` | Active exceptions; supports `?status=ACTIVE` |
 | POST | `/api/demo/reset` | Restore the original demo seed |
 
 The future MBA layer can understand language, gather missing information,
 confirm actions, and invoke these APIs. It should obtain impact and driver
 availability from the backend rather than calculating them itself.
+
+## Create a load assignment
+
+`POST /api/assignments` creates an assignment for an unassigned shipment. It
+updates the shipment, creates a pending assignment, updates the driver's
+current or next shipment, and records a `LOAD_ASSIGNED` event for the future
+outbound notification adapter. The endpoint does not send WhatsApp messages
+yet.
+
+Request:
+
+```bash
+curl -X POST http://localhost:3000/api/assignments \
+  -H "Content-Type: application/json" \
+  -d '{"eventId":"ASSIGN-0001","shipmentId":"SHP-1092","driverId":"DRV-203"}'
+```
+
+All three fields are required:
+
+- `eventId` is the caller-provided idempotency key.
+- `shipmentId` must identify an existing shipment.
+- `driverId` must identify an existing driver with an open current or next
+  assignment slot, depending on the shipment status.
+
+The first successful request returns `201`. Repeating the exact event returns
+`200` with `data.idempotent: true` and does not create another assignment.
+Reusing an `eventId` with different IDs returns `ASSIGNMENT_EVENT_CONFLICT`.
+Trying to overwrite an active assignment returns
+`SHIPMENT_ALREADY_ASSIGNED`; use the existing reassignment API for that
+operation.
+
+The response contains the stored event and the updated assignment, shipment,
+and driver. For example, the event portion is:
+
+```json
+{
+  "data": {
+    "idempotent": false,
+    "event": {
+      "eventId": "ASSIGN-0001",
+      "type": "LOAD_ASSIGNED",
+      "shipmentId": "SHP-1092",
+      "driverId": "DRV-203",
+      "occurredAt": "2026-08-21T10:30:00.000Z"
+    }
+  }
+}
+```
+
+Assignment event records are in memory and are cleared by
+`POST /api/demo/reset`. The caller is treated as the assignment
+decision-maker, so this endpoint does not run the available-driver
+recommendation rule. It does prevent a driver from receiving two current
+shipments or two next shipments.
+
+## Shipment date and time model
+
+The current model intentionally keeps `serviceDate` and `pickupTime` separate:
+
+- `serviceDate` is the business operating date used by the daily summary and
+  resettable demo dataset.
+- `pickupTime` is the local appointment time in `HH:mm` format and is used by
+  the current driver-availability rule.
+
+They should not be replaced with a generated `pickupAt` yet. The current data
+does not include an IANA timezone or UTC offset, so a generated timestamp
+would be ambiguous outside the server's local timezone and would duplicate
+the existing fields. The notification layer can combine and format the two
+values for the current single-timezone demo.
+
+When the upstream system supplies timezone-aware timestamps, the preferred
+migration is to store one canonical ISO 8601 value such as
+`2027-08-25T10:00:00+05:30` in `pickupAt` and derive display dates and times
+from it. Keep `serviceDate` only if it continues to represent a separate
+business/operating date.
 
 ## Dataset and deterministic demo rules
 
@@ -300,6 +378,6 @@ The service remains suitable for one future Render Web Service: it uses
 does not hardcode its callback host, and does not write runtime state to disk.
 
 A future phase can add outbound WhatsApp Utility template notifications for
-assignment and exception events. MBA connector schemas/configuration can map
-to the generic REST APIs while transportation decisions remain in the backend
-or its future platform adapter.
+the recorded `LOAD_ASSIGNED` event and exception events. MBA connector
+schemas/configuration can map to the generic REST APIs while transportation
+decisions remain in the backend or its future platform adapter.

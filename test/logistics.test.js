@@ -89,6 +89,19 @@ function reassignToAmit(server) {
   });
 }
 
+function createLoadAssignment(server, overrides = {}) {
+  return request(server, {
+    method: 'POST',
+    path: '/api/assignments',
+    body: {
+      eventId: 'ASSIGN-0001',
+      shipmentId: 'SHP-1092',
+      driverId: 'DRV-203',
+      ...overrides
+    }
+  });
+}
+
 test('mock logistics demo APIs', async (t) => {
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -186,6 +199,93 @@ test('mock logistics demo APIs', async (t) => {
       repeated.body.error.code,
       'ASSIGNMENT_ALREADY_RESPONDED'
     );
+  });
+
+  await t.test('creates a new load assignment', async () => {
+    await resetDemo(server);
+    const created = await createLoadAssignment(server);
+    const shipment = await request(server, {
+      path: '/api/shipments/SHP-1092'
+    });
+    const driverAssignments = await request(server, {
+      path: '/api/drivers/DRV-203/assignments'
+    });
+
+    assert.equal(created.statusCode, 201);
+    assert.equal(created.body.data.idempotent, false);
+    assert.equal(created.body.data.event.eventId, 'ASSIGN-0001');
+    assert.equal(created.body.data.event.type, 'LOAD_ASSIGNED');
+    assert.equal(created.body.data.assignment.status, 'ASSIGNED');
+    assert.equal(created.body.data.assignment.driverId, 'DRV-203');
+    assert.match(
+      created.body.data.assignment.assignedAt,
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/
+    );
+    assert.equal(shipment.body.data.driverId, 'DRV-203');
+    assert.equal(shipment.body.data.driver.status, 'ASSIGNED');
+    assert.equal(shipment.body.data.driver.nextShipmentId, 'SHP-1092');
+    assert.deepEqual(
+      driverAssignments.body.data.map((item) => item.shipmentId),
+      ['SHP-1092']
+    );
+  });
+
+  await t.test('handles event retries without duplicate assignments', async () => {
+    await resetDemo(server);
+    const created = await createLoadAssignment(server);
+    const retried = await createLoadAssignment(server);
+    const driverAssignments = await request(server, {
+      path: '/api/drivers/DRV-203/assignments'
+    });
+
+    assert.equal(created.statusCode, 201);
+    assert.equal(retried.statusCode, 200);
+    assert.equal(retried.body.data.idempotent, true);
+    assert.equal(driverAssignments.body.count, 1);
+  });
+
+  await t.test('rejects conflicting events and existing assignments', async () => {
+    await resetDemo(server);
+    await createLoadAssignment(server);
+    const eventConflict = await createLoadAssignment(server, {
+      shipmentId: 'SHP-1050'
+    });
+    const existingAssignment = await createLoadAssignment(server, {
+      eventId: 'ASSIGN-0002',
+      shipmentId: 'SHP-1024',
+      driverId: 'DRV-101'
+    });
+
+    assert.equal(eventConflict.statusCode, 409);
+    assert.equal(
+      eventConflict.body.error.code,
+      'ASSIGNMENT_EVENT_CONFLICT'
+    );
+    assert.equal(existingAssignment.statusCode, 409);
+    assert.equal(
+      existingAssignment.body.error.code,
+      'SHIPMENT_ALREADY_ASSIGNED'
+    );
+  });
+
+  await t.test('validates required assignment fields', async () => {
+    await resetDemo(server);
+    const response = await request(server, {
+      method: 'POST',
+      path: '/api/assignments',
+      body: {
+        shipmentId: 'SHP-1092',
+        driverId: 'DRV-203'
+      }
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.deepEqual(response.body, {
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'eventId is required'
+      }
+    });
   });
 
   await t.test('records a breakdown and updates shipment and exception views', async () => {

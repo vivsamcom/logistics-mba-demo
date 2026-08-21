@@ -27,6 +27,10 @@
       "value": "DRV-203"
     },
     {
+      "key": "assignmentEventId",
+      "value": "ASSIGN-0001"
+    },
+    {
       "key": "verifyToken",
       "value": "replace-with-WEBHOOK_VERIFY_TOKEN"
     }
@@ -160,6 +164,29 @@
     {
       "name": "Drivers and Assignments",
       "item": [
+        {
+          "name": "Create Load Assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{assignmentEventId}}\",\n  \"shipmentId\": \"SHP-1092\",\n  \"driverId\": \"{{newDriverId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/assignments",
+            "description": "Run Demo Reset first. Creates a pending assignment for the unassigned SHP-1092. Repeating the same event is idempotent; change assignmentEventId before replaying a different assignment."
+          }
+        },
         {
           "name": "Driver Current Trip",
           "request": {
