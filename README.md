@@ -120,7 +120,7 @@ inventing or asking the user for a driver or dispatcher ID. The connector
 supplies the current WhatsApp sender in the request header:
 
 ```http
-X-WhatsApp-Phone: 919800000101
+X-WhatsApp-Phone: 919823784110
 ```
 
 The backend removes all non-digit characters and resolves the normalized
@@ -128,11 +128,11 @@ number against the fictional mappings in `src/data/seed/users.json`:
 
 | Demo phone | Role | Entity | Name |
 |---|---|---|---|
-| `919800000101` | `DRIVER` | `DRV-101` | Raj |
-| `919800000201` | `DISPATCHER` | `DSP-001` | Anita |
+| `919823784110` | `DRIVER` | `DRV-101` | Raj |
+| `919511758488` | `DISPATCHER` | `DSP-001` | Anita |
 
 These formatted Driver values all resolve to the same persona:
-`+91 98000 00101`, `919800000101`, and `91-98000-00101`. Unknown numbers are
+`+91 98237 84110`, `919823784110`, and `91-98237-84110`. Unknown numbers are
 never assigned a default role. A missing header returns
 `WHATSAPP_PHONE_REQUIRED`; an unmapped number returns `PERSONA_NOT_FOUND`.
 
@@ -157,17 +157,17 @@ mock TMS endpoints:
 The diagnostic endpoint deliberately omits the full phone number:
 
 ```bash
-curl -H "X-WhatsApp-Phone: 919800000101" \
+curl -H "X-WhatsApp-Phone: 919823784110" \
   http://localhost:3000/api/me/persona
 ```
 
 Driver current trip and assignments:
 
 ```bash
-curl -H "X-WhatsApp-Phone: 919800000101" \
+curl -H "X-WhatsApp-Phone: 919823784110" \
   http://localhost:3000/api/me/current-trip
 
-curl -H "X-WhatsApp-Phone: 919800000101" \
+curl -H "X-WhatsApp-Phone: 919823784110" \
   http://localhost:3000/api/me/assignments
 ```
 
@@ -175,7 +175,7 @@ Driver assignment acceptance:
 
 ```bash
 curl -X POST \
-  -H "X-WhatsApp-Phone: 919800000101" \
+  -H "X-WhatsApp-Phone: 919823784110" \
   -H "Content-Type: application/json" \
   -d '{"response":"ACCEPT"}' \
   http://localhost:3000/api/me/assignments/SHP-1088/respond
@@ -186,7 +186,7 @@ accept a caller-selected `driverId`:
 
 ```bash
 curl -X POST \
-  -H "X-WhatsApp-Phone: 919800000101" \
+  -H "X-WhatsApp-Phone: 919823784110" \
   -H "Content-Type: application/json" \
   -d '{"type":"VEHICLE_BREAKDOWN","location":"Near Pune","delayMinutes":90}' \
   http://localhost:3000/api/me/shipments/SHP-1024/exceptions
@@ -195,13 +195,13 @@ curl -X POST \
 Dispatcher delayed shipments, impact, and available drivers:
 
 ```bash
-curl -H "X-WhatsApp-Phone: 919800000201" \
+curl -H "X-WhatsApp-Phone: 919511758488" \
   http://localhost:3000/api/dispatcher/shipments/delayed
 
-curl -H "X-WhatsApp-Phone: 919800000201" \
+curl -H "X-WhatsApp-Phone: 919511758488" \
   http://localhost:3000/api/dispatcher/shipments/SHP-1088/impact
 
-curl -H "X-WhatsApp-Phone: 919800000201" \
+curl -H "X-WhatsApp-Phone: 919511758488" \
   http://localhost:3000/api/dispatcher/shipments/SHP-1088/available-drivers
 ```
 
@@ -209,7 +209,7 @@ Dispatcher reassignment:
 
 ```bash
 curl -X POST \
-  -H "X-WhatsApp-Phone: 919800000201" \
+  -H "X-WhatsApp-Phone: 919511758488" \
   -H "Content-Type: application/json" \
   -d '{"newDriverId":"DRV-203"}' \
   http://localhost:3000/api/dispatcher/shipments/SHP-1088/reassign

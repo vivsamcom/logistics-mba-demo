@@ -9,8 +9,8 @@ process.env.META_SIGNATURE_VALIDATION_ENABLED = 'false';
 const app = require('../src/app');
 const { normalizePhone } = require('../src/utils/phone');
 
-const DRIVER_PHONE = '919800000101';
-const DISPATCHER_PHONE = '919800000201';
+const DRIVER_PHONE = '919823784110';
+const DISPATCHER_PHONE = '919511758488';
 
 function request(
   server,
@@ -76,15 +76,15 @@ test('persona-aware MBA APIs', async (t) => {
   t.after(() => new Promise((resolve) => server.close(resolve)));
 
   await t.test('normalizes formatted WhatsApp phone numbers', () => {
-    assert.equal(normalizePhone('+91 98000 00101'), DRIVER_PHONE);
-    assert.equal(normalizePhone('91-98000-00101'), DRIVER_PHONE);
+    assert.equal(normalizePhone('+91 98237 84110'), DRIVER_PHONE);
+    assert.equal(normalizePhone('91-98237-84110'), DRIVER_PHONE);
     assert.equal(normalizePhone(DRIVER_PHONE), DRIVER_PHONE);
   });
 
   await t.test('resolves the Driver persona without returning the phone', async () => {
     const response = await request(server, {
       path: '/api/me/persona',
-      headers: personaHeaders('+91 98000 00101')
+      headers: personaHeaders('+91 98237 84110')
     });
 
     assert.equal(response.statusCode, 200);
