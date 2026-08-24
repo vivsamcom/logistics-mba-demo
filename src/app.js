@@ -5,6 +5,8 @@ const driverRoutes = require('./routes/drivers.routes');
 const assignmentRoutes = require('./routes/assignments.routes');
 const exceptionRoutes = require('./routes/exceptions.routes');
 const demoRoutes = require('./routes/demo.routes');
+const meRoutes = require('./routes/me.routes');
+const dispatcherRoutes = require('./routes/dispatcher.routes');
 const errorHandler = require('./middleware/error-handler');
 
 const app = express();
@@ -35,6 +37,8 @@ app.use('/api/drivers', driverRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/exceptions', exceptionRoutes);
 app.use('/api/demo', demoRoutes);
+app.use('/api/me', meRoutes);
+app.use('/api/dispatcher', dispatcherRoutes);
 
 app.use(errorHandler);
 

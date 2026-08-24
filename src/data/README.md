@@ -19,3 +19,8 @@ Runtime changes are never written back to these JSON files. This makes reset
 reliable and avoids depending on persistent local storage when the application
 is deployed to Render. In-memory assignment event IDs are also cleared by
 reset.
+
+`seed/users.json` contains fictional WhatsApp-to-persona mappings for the
+MBA-facing APIs. Phone values are normalized to digits before lookup. They are
+demo identifiers only and must not be replaced with real personal numbers in
+source control.

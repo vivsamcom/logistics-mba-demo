@@ -23,6 +23,9 @@ system. It does not reproduce or claim to expose any vendor's product APIs.
   APIs
 - Assignment response, exception reporting, and shipment reassignment actions
 - `POST /api/demo/reset` for repeatable rehearsals
+- Persona-aware MBA APIs that resolve Drivers and Dispatchers from the
+  `X-WhatsApp-Phone` request header
+- Backend-enforced Driver and Dispatcher role boundaries for MBA-facing routes
 
 There is no external logistics-platform connection, database, optimizer,
 queue, LLM, MBA configuration, or production persistence in this phase.
@@ -109,6 +112,113 @@ Expected domain and validation errors use:
   }
 }
 ```
+
+## Persona-aware MBA APIs
+
+Meta Business Agent connector tools can call an MBA-facing layer without
+inventing or asking the user for a driver or dispatcher ID. The connector
+supplies the current WhatsApp sender in the request header:
+
+```http
+X-WhatsApp-Phone: 919800000101
+```
+
+The backend removes all non-digit characters and resolves the normalized
+number against the fictional mappings in `src/data/seed/users.json`:
+
+| Demo phone | Role | Entity | Name |
+|---|---|---|---|
+| `919800000101` | `DRIVER` | `DRV-101` | Raj |
+| `919800000201` | `DISPATCHER` | `DSP-001` | Anita |
+
+These formatted Driver values all resolve to the same persona:
+`+91 98000 00101`, `919800000101`, and `91-98000-00101`. Unknown numbers are
+never assigned a default role. A missing header returns
+`WHATSAPP_PHONE_REQUIRED`; an unmapped number returns `PERSONA_NOT_FOUND`.
+
+The new endpoints reuse the same services and in-memory data as the generic
+mock TMS endpoints:
+
+| Method | Endpoint | Role | Purpose |
+|---|---|---|---|
+| GET | `/api/me/persona` | Driver or Dispatcher | Verify connector persona resolution |
+| GET | `/api/me/current-trip` | Driver | Current Driver trip |
+| GET | `/api/me/assignments` | Driver | Current and upcoming Driver assignments |
+| POST | `/api/me/assignments/:shipmentId/respond` | Driver | Accept or reject the Driver's assignment |
+| POST | `/api/me/shipments/:shipmentId/exceptions` | Driver | Report an exception for the Driver's shipment |
+| GET | `/api/dispatcher/shipments/today` | Dispatcher | Current shipment summary |
+| GET | `/api/dispatcher/shipments/delayed` | Dispatcher | Delayed shipments |
+| GET | `/api/dispatcher/exceptions` | Dispatcher | Active or resolved fleet exceptions |
+| GET | `/api/dispatcher/shipments/:shipmentId` | Dispatcher | Shipment details |
+| GET | `/api/dispatcher/shipments/:shipmentId/impact` | Dispatcher | Downstream impact from existing backend rules |
+| GET | `/api/dispatcher/shipments/:shipmentId/available-drivers` | Dispatcher | Available drivers from existing backend rules |
+| POST | `/api/dispatcher/shipments/:shipmentId/reassign` | Dispatcher | Confirmed shipment reassignment |
+
+The diagnostic endpoint deliberately omits the full phone number:
+
+```bash
+curl -H "X-WhatsApp-Phone: 919800000101" \
+  http://localhost:3000/api/me/persona
+```
+
+Driver current trip and assignments:
+
+```bash
+curl -H "X-WhatsApp-Phone: 919800000101" \
+  http://localhost:3000/api/me/current-trip
+
+curl -H "X-WhatsApp-Phone: 919800000101" \
+  http://localhost:3000/api/me/assignments
+```
+
+Driver assignment acceptance:
+
+```bash
+curl -X POST \
+  -H "X-WhatsApp-Phone: 919800000101" \
+  -H "Content-Type: application/json" \
+  -d '{"response":"ACCEPT"}' \
+  http://localhost:3000/api/me/assignments/SHP-1088/respond
+```
+
+Driver exception reporting derives `DRV-101` from the header and does not
+accept a caller-selected `driverId`:
+
+```bash
+curl -X POST \
+  -H "X-WhatsApp-Phone: 919800000101" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"VEHICLE_BREAKDOWN","location":"Near Pune","delayMinutes":90}' \
+  http://localhost:3000/api/me/shipments/SHP-1024/exceptions
+```
+
+Dispatcher delayed shipments, impact, and available drivers:
+
+```bash
+curl -H "X-WhatsApp-Phone: 919800000201" \
+  http://localhost:3000/api/dispatcher/shipments/delayed
+
+curl -H "X-WhatsApp-Phone: 919800000201" \
+  http://localhost:3000/api/dispatcher/shipments/SHP-1088/impact
+
+curl -H "X-WhatsApp-Phone: 919800000201" \
+  http://localhost:3000/api/dispatcher/shipments/SHP-1088/available-drivers
+```
+
+Dispatcher reassignment:
+
+```bash
+curl -X POST \
+  -H "X-WhatsApp-Phone: 919800000201" \
+  -H "Content-Type: application/json" \
+  -d '{"newDriverId":"DRV-203"}' \
+  http://localhost:3000/api/dispatcher/shipments/SHP-1088/reassign
+```
+
+The persona layer is an authorization/context wrapper for the MBA demo. The
+generic mock TMS routes below intentionally remain header-free for Postman,
+direct testing, and demo administration. `X-WhatsApp-Phone` is not a
+replacement for authenticating the connector in production.
 
 ## Mock logistics APIs
 

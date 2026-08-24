@@ -1,0 +1,14 @@
+[
+  {
+    "whatsappPhone": "919823784110",
+    "role": "DRIVER",
+    "entityId": "DRV-101",
+    "name": "Raj"
+  },
+  {
+    "whatsappPhone": "919511758288",
+    "role": "DISPATCHER",
+    "entityId": "DSP-001",
+    "name": "Anita"
+  }
+]

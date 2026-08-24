@@ -31,6 +31,14 @@
       "value": "ASSIGN-0001"
     },
     {
+      "key": "driverWhatsAppPhone",
+      "value": "919800000101"
+    },
+    {
+      "key": "dispatcherWhatsAppPhone",
+      "value": "919800000201"
+    },
+    {
       "key": "verifyToken",
       "value": "replace-with-WEBHOOK_VERIFY_TOKEN"
     }
@@ -269,6 +277,215 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/exceptions?status=RESOLVED"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MBA Driver Persona",
+      "item": [
+        {
+          "name": "Resolve My Persona",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-WhatsApp-Phone",
+                "value": "{{driverWhatsAppPhone}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/me/persona",
+            "description": "Resolves the current WhatsApp sender without returning the full phone number. Change the header to dispatcherWhatsAppPhone to verify the Dispatcher persona."
+          }
+        },
+        {
+          "name": "My Current Trip",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-WhatsApp-Phone",
+                "value": "{{driverWhatsAppPhone}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/me/current-trip"
+          }
+        },
+        {
+          "name": "My Assignments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-WhatsApp-Phone",
+                "value": "{{driverWhatsAppPhone}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/me/assignments"
+          }
+        },
+        {
+          "name": "Accept My Assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-WhatsApp-Phone",
+                "value": "{{driverWhatsAppPhone}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"response\": \"ACCEPT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/me/assignments/{{nextShipmentId}}/respond",
+            "description": "Run Demo Reset first. The backend derives DRV-101 from the header; no driverId is accepted from the connector."
+          }
+        },
+        {
+          "name": "Report My Shipment Exception",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-WhatsApp-Phone",
+                "value": "{{driverWhatsAppPhone}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"VEHICLE_BREAKDOWN\",\n  \"location\": \"Near Pune\",\n  \"delayMinutes\": 90\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/me/shipments/{{shipmentId}}/exceptions",
+            "description": "The backend derives DRV-101 from the header and verifies that the shipment belongs to that Driver."
+          }
+        }
+      ]
+    },
+    {
+      "name": "MBA Dispatcher Persona",
+      "item": [
+        {
+          "name": "Today's Fleet Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-WhatsApp-Phone",
+                "value": "{{dispatcherWhatsAppPhone}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/dispatcher/shipments/today"
+          }
+        },
+        {
+          "name": "Delayed Fleet Shipments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-WhatsApp-Phone",
+                "value": "{{dispatcherWhatsAppPhone}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/dispatcher/shipments/delayed"
+          }
+        },
+        {
+          "name": "Fleet Exceptions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-WhatsApp-Phone",
+                "value": "{{dispatcherWhatsAppPhone}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/dispatcher/exceptions?status=ACTIVE"
+          }
+        },
+        {
+          "name": "Dispatcher Shipment Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-WhatsApp-Phone",
+                "value": "{{dispatcherWhatsAppPhone}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/dispatcher/shipments/{{shipmentId}}"
+          }
+        },
+        {
+          "name": "Dispatcher Shipment Impact",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-WhatsApp-Phone",
+                "value": "{{dispatcherWhatsAppPhone}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/dispatcher/shipments/{{nextShipmentId}}/impact"
+          }
+        },
+        {
+          "name": "Dispatcher Available Drivers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-WhatsApp-Phone",
+                "value": "{{dispatcherWhatsAppPhone}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/dispatcher/shipments/{{nextShipmentId}}/available-drivers"
+          }
+        },
+        {
+          "name": "Dispatcher Reassign Shipment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-WhatsApp-Phone",
+                "value": "{{dispatcherWhatsAppPhone}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newDriverId\": \"{{newDriverId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/dispatcher/shipments/{{nextShipmentId}}/reassign",
+            "description": "Run Demo Reset first. Only a mapped Dispatcher persona can use this route."
           }
         }
       ]

@@ -1,7 +1,9 @@
+const seedUsers = require('../data/seed/users.json');
 const seedDrivers = require('../data/seed/drivers.json');
 const seedShipments = require('../data/seed/shipments.json');
 const seedAssignments = require('../data/seed/assignments.json');
 const seedExceptions = require('../data/seed/exceptions.json');
+const { normalizePhone } = require('../utils/phone');
 
 // Mutable demo store that can later be replaced by a platform adapter.
 
@@ -47,6 +49,7 @@ function synchronizeShipmentDates() {
 
 function reset() {
   state = {
+    users: clone(seedUsers),
     drivers: clone(seedDrivers),
     shipments: clone(seedShipments),
     assignments: clone(seedAssignments),
@@ -61,6 +64,18 @@ function reset() {
       const match = /^EX-(\d+)$/.exec(exception.exceptionId);
       return match ? Math.max(highest, Number(match[1])) : highest;
     }, 0) + 1;
+}
+
+function getUsers() {
+  return state.users;
+}
+
+function getUserByWhatsAppPhone(phone) {
+  const normalizedPhone = normalizePhone(phone);
+
+  return state.users.find(
+    (user) => normalizePhone(user.whatsappPhone) === normalizedPhone
+  );
 }
 
 function getDrivers() {
@@ -128,6 +143,8 @@ reset();
 
 module.exports = {
   reset,
+  getUsers,
+  getUserByWhatsAppPhone,
   getDrivers,
   getDriverById,
   getShipments,
