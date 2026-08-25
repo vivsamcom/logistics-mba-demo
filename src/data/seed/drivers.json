@@ -3,9 +3,9 @@
     "driverId": "DRV-101",
     "name": "Raj",
     "phone": "+919823784110",
-    "status": "ON_TRIP",
-    "currentShipmentId": "SHP-1024",
-    "nextShipmentId": "SHP-1088"
+    "status": "AVAILABLE",
+    "currentShipmentId": null,
+    "nextShipmentId": null
   },
   {
     "driverId": "DRV-203",
