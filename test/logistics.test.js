@@ -6,6 +6,8 @@ const { once } = require('node:events');
 process.env.NODE_ENV = 'test';
 process.env.META_SIGNATURE_VALIDATION_ENABLED = 'false';
 process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'false';
+process.env.WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL =
+  'https://logistics-mba-demo.onrender.com/images/load-assignment-header.png';
 
 const app = require('../src/app');
 const repository = require('../src/repositories/mock-logistics.repository');
@@ -270,6 +272,14 @@ test('mock logistics demo APIs', async (t) => {
         name: 'new_load_assignment_v1',
         category: 'UTILITY',
         language: 'en_US',
+        header: {
+          format: 'IMAGE',
+          image: {
+            link:
+              'https://logistics-mba-demo.onrender.com/images/' +
+              'load-assignment-header.png'
+          }
+        },
         bodyParameters: [
           { position: 1, name: 'shipment', value: 'SHP-1092' },
           {
@@ -349,7 +359,8 @@ test('mock logistics demo APIs', async (t) => {
       enabled: process.env.WHATSAPP_NOTIFICATIONS_ENABLED,
       token: process.env.WHATSAPP_ACCESS_TOKEN,
       phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
-      graphApiVersion: process.env.WHATSAPP_GRAPH_API_VERSION
+      graphApiVersion: process.env.WHATSAPP_GRAPH_API_VERSION,
+      headerImageUrl: process.env.WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL
     };
     const calls = [];
     const infoLogs = [];
@@ -363,7 +374,11 @@ test('mock logistics demo APIs', async (t) => {
       for (const [name, value] of [
         ['WHATSAPP_ACCESS_TOKEN', originalEnvironment.token],
         ['WHATSAPP_PHONE_NUMBER_ID', originalEnvironment.phoneNumberId],
-        ['WHATSAPP_GRAPH_API_VERSION', originalEnvironment.graphApiVersion]
+        ['WHATSAPP_GRAPH_API_VERSION', originalEnvironment.graphApiVersion],
+        [
+          'WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL',
+          originalEnvironment.headerImageUrl
+        ]
       ]) {
         if (value === undefined) {
           delete process.env[name];
@@ -377,6 +392,8 @@ test('mock logistics demo APIs', async (t) => {
     process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
     process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-number-id';
     process.env.WHATSAPP_GRAPH_API_VERSION = 'v25.0';
+    process.env.WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL =
+      'https://logistics.example/images/load-assignment-header.png';
     console.log = (message) => infoLogs.push(message);
     globalThis.fetch = async (url, options) => {
       calls.push({ url, options });
@@ -389,9 +406,15 @@ test('mock logistics demo APIs', async (t) => {
     };
 
     await resetDemo(server);
-    const created = await createLoadAssignment(server);
-    const retried = await createLoadAssignment(server);
+    const reassigned = await reassignToAmit(server);
+    const created = await createLoadAssignment(server, {
+      driverId: 'DRV-101'
+    });
+    const retried = await createLoadAssignment(server, {
+      driverId: 'DRV-101'
+    });
 
+    assert.equal(reassigned.statusCode, 200);
     assert.equal(created.statusCode, 201);
     assert.deepEqual(created.body.data.notificationDelivery, {
       status: 'ACCEPTED_BY_META',
@@ -420,12 +443,25 @@ test('mock logistics demo APIs', async (t) => {
     assert.deepEqual(JSON.parse(calls[0].options.body), {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
-      to: '15550000203',
+      to: '919823784110',
       type: 'template',
       template: {
         name: 'new_load_assignment_v1',
         language: { code: 'en_US' },
         components: [
+          {
+            type: 'header',
+            parameters: [
+              {
+                type: 'image',
+                image: {
+                  link:
+                    'https://logistics.example/images/' +
+                    'load-assignment-header.png'
+                }
+              }
+            ]
+          },
           {
             type: 'body',
             parameters: [

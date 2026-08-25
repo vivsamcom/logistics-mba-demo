@@ -116,13 +116,16 @@ WHATSAPP_ACCESS_TOKEN=
 WHATSAPP_PHONE_NUMBER_ID=
 WHATSAPP_BUSINESS_ACCOUNT_ID=
 WHATSAPP_GRAPH_API_VERSION=
+WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL=https://logistics-mba-demo.onrender.com/images/load-assignment-header.png
 WHATSAPP_NOTIFICATIONS_ENABLED=false
 ```
 
 Never commit `.env`. Set `WHATSAPP_NOTIFICATIONS_ENABLED=true` only after the
 access token, sender phone-number ID, and a currently supported Graph API
-version are configured. `WHATSAPP_BUSINESS_ACCOUNT_ID` is not used by the send
-call, but remains available for template-management operations.
+version are configured. `WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL` can override the
+default public image URL used by the load-assignment template.
+`WHATSAPP_BUSINESS_ACCOUNT_ID` is not used by the send call, but remains
+available for template-management operations.
 
 ## API response conventions
 
@@ -322,6 +325,12 @@ and a notification-ready payload. For example:
         "name": "new_load_assignment_v1",
         "category": "UTILITY",
         "language": "en_US",
+        "header": {
+          "format": "IMAGE",
+          "image": {
+            "link": "https://logistics-mba-demo.onrender.com/images/load-assignment-header.png"
+          }
+        },
         "bodyParameters": [
           { "position": 1, "name": "shipment", "value": "SHP-1092" },
           { "position": 2, "name": "pickup", "value": "Chennai Port" },
@@ -371,10 +380,10 @@ Please review and confirm the assignment.
 
 The service validates the driver's phone number and all five body parameter
 values before changing assignment state. The outbound adapter removes display
-formatting from the recipient number, preserves parameter order, and maps only
-the five body values to Meta's template wire format. Existing button metadata
-is retained in the API response for compatibility, but is not sent because the
-currently approved template is body-only.
+formatting from the recipient number, validates and maps the HTTPS image header,
+preserves body-parameter order, and maps the five body values to Meta's template
+wire format. Existing button metadata is retained in the API response for
+compatibility; the approved template does not require dynamic button parameters.
 
 Meta accepting a request is recorded as `ACCEPTED_BY_META` with its `wamid`;
 actual delivery statuses continue to arrive through the webhook. A Meta or
@@ -578,6 +587,7 @@ Configure the sender credentials in `.env` or in the deployment environment:
 WHATSAPP_ACCESS_TOKEN=<system-user-token-with-whatsapp_business_messaging>
 WHATSAPP_PHONE_NUMBER_ID=<meta-sender-phone-number-id>
 WHATSAPP_GRAPH_API_VERSION=<supported-version-shown-by-meta>
+WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL=https://logistics-mba-demo.onrender.com/images/load-assignment-header.png
 WHATSAPP_NOTIFICATIONS_ENABLED=true
 ```
 
@@ -589,6 +599,31 @@ dashboard. The Cloud API request is:
 ```text
 POST https://graph.facebook.com/{version}/{phone-number-id}/messages
 ```
+
+### End-to-end assignment notification check
+
+In the seed data, the real demo WhatsApp number belongs to `DRV-101`, which
+already has `SHP-1088` in its next-assignment slot. Reset the demo, move that
+shipment to an available driver, and then assign `SHP-1092` to `DRV-101`:
+
+```bash
+curl -X POST https://logistics-mba-demo.onrender.com/api/demo/reset
+
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"newDriverId":"DRV-203"}' \
+  https://logistics-mba-demo.onrender.com/api/shipments/SHP-1088/reassign
+
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"eventId":"ASSIGN-LIVE-0001","shipmentId":"SHP-1092","driverId":"DRV-101"}' \
+  https://logistics-mba-demo.onrender.com/api/assignments
+```
+
+The last response should contain
+`data.notificationDelivery.status: "ACCEPTED_BY_META"`, a `messageId`, and
+`data.notification.recipient.phone: "+919823784110"`. A later webhook status
+of `delivered` confirms delivery to WhatsApp.
 
 ### Render diagnostics
 

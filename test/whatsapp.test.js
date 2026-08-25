@@ -17,6 +17,13 @@ function notificationFixture() {
       name: 'new_load_assignment_v1',
       category: 'UTILITY',
       language: 'en_US',
+      header: {
+        format: 'IMAGE',
+        image: {
+          link:
+            'https://logistics.example/images/load-assignment-header.png'
+        }
+      },
       bodyParameters: [
         { position: 3, name: 'delivery', value: 'Bengaluru Warehouse' },
         { position: 1, name: 'shipment', value: 'SHP-1024' },
@@ -35,7 +42,7 @@ function notificationFixture() {
   };
 }
 
-test('builds the approved body-only utility template payload', () => {
+test('builds the approved image-header utility template payload', () => {
   assert.deepEqual(buildTemplateMessage(notificationFixture()), {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
@@ -45,6 +52,19 @@ test('builds the approved body-only utility template payload', () => {
       name: 'new_load_assignment_v1',
       language: { code: 'en_US' },
       components: [
+        {
+          type: 'header',
+          parameters: [
+            {
+              type: 'image',
+              image: {
+                link:
+                  'https://logistics.example/images/' +
+                  'load-assignment-header.png'
+              }
+            }
+          ]
+        },
         {
           type: 'body',
           parameters: [

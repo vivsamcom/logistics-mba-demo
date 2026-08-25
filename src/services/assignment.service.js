@@ -1,4 +1,7 @@
 const repository = require('../repositories/mock-logistics.repository');
+const {
+  getWhatsAppAssignmentHeaderImageUrl
+} = require('../config/env');
 const AppError = require('../utils/app-error');
 
 const RESPONSES = {
@@ -132,6 +135,12 @@ function buildAssignmentNotification(shipment, driver) {
       name: 'new_load_assignment_v1',
       category: 'UTILITY',
       language: 'en_US',
+      header: {
+        format: 'IMAGE',
+        image: {
+          link: getWhatsAppAssignmentHeaderImageUrl()
+        }
+      },
       bodyParameters: [
         { position: 1, name: 'shipment', value: shipmentId },
         { position: 2, name: 'pickup', value: pickupLocation },

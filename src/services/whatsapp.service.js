@@ -82,6 +82,56 @@ function writeLog(level, event, details) {
   console.log(output);
 }
 
+function buildImageHeaderComponent(template) {
+  const header = template && template.header;
+  const imageLink = header && header.image && header.image.link;
+
+  if (
+    !header ||
+    String(header.format || '').toUpperCase() !== 'IMAGE' ||
+    typeof imageLink !== 'string' ||
+    !imageLink.trim()
+  ) {
+    const error = new Error(
+      'WhatsApp template IMAGE header with an image link is required'
+    );
+    error.code = 'WHATSAPP_TEMPLATE_INVALID';
+    throw error;
+  }
+
+  let imageUrl;
+
+  try {
+    imageUrl = new URL(imageLink.trim());
+  } catch (cause) {
+    const error = new Error(
+      'WhatsApp template header image link must be a valid HTTPS URL'
+    );
+    error.code = 'WHATSAPP_TEMPLATE_INVALID';
+    throw error;
+  }
+
+  if (imageUrl.protocol !== 'https:') {
+    const error = new Error(
+      'WhatsApp template header image link must be a valid HTTPS URL'
+    );
+    error.code = 'WHATSAPP_TEMPLATE_INVALID';
+    throw error;
+  }
+
+  return {
+    type: 'header',
+    parameters: [
+      {
+        type: 'image',
+        image: {
+          link: imageUrl.href
+        }
+      }
+    ]
+  };
+}
+
 function buildTemplateMessage(notification) {
   const template = notification && notification.template;
   const recipient = notification && notification.recipient;
@@ -116,6 +166,7 @@ function buildTemplateMessage(notification) {
         code: template.language
       },
       components: [
+        buildImageHeaderComponent(template),
         {
           type: 'body',
           parameters: bodyParameters
