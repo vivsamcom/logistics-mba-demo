@@ -12,7 +12,7 @@
     "name": "Amit",
     "phone": "+15550000203",
     "status": "AVAILABLE",
-    "availableFrom": "18:00",
+    "availableFrom": "08:00",
     "currentShipmentId": null,
     "nextShipmentId": null
   },
@@ -21,7 +21,7 @@
     "name": "Sunil",
     "phone": "+15550000218",
     "status": "AVAILABLE",
-    "availableFrom": "18:30",
+    "availableFrom": "08:30",
     "currentShipmentId": null,
     "nextShipmentId": null
   },
