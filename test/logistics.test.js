@@ -117,10 +117,11 @@ function reportBreakdown(server) {
   });
 }
 
-function reassignToAmit(server) {
+function reassignToAmit(server, headers = {}) {
   return request(server, {
     method: 'POST',
     path: '/api/shipments/SHP-1088/reassign',
+    headers,
     body: { newDriverId: 'DRV-203' }
   });
 }
@@ -731,6 +732,18 @@ test('mock logistics demo APIs', async (t) => {
     assert.equal(reassignment.statusCode, 200);
     assert.equal(reassignment.body.data.driverId, 'DRV-203');
     assert.equal(reassignment.body.data.previousDriverId, null);
+    assert.equal(
+      reassignment.body.data.notification.recipient.driverId,
+      'DRV-203'
+    );
+    assert.equal(
+      reassignment.body.data.notification.template.name,
+      'new_load_assignment_v1'
+    );
+    assert.deepEqual(reassignment.body.data.notificationDelivery, {
+      status: 'SKIPPED',
+      reason: 'WHATSAPP_NOTIFICATIONS_DISABLED'
+    });
     assert.equal(shipment.body.data.driverId, 'DRV-203');
     assert.equal(shipment.body.data.assignment.driverId, 'DRV-203');
     assert.deepEqual(
@@ -738,6 +751,200 @@ test('mock logistics demo APIs', async (t) => {
       ['SHP-1088']
     );
     assert.deepEqual(rajAssignments.body.data, []);
+  });
+
+  await t.test('resolves old-driver exceptions when reassigning', async () => {
+    await resetDemo(server);
+    await assignShipmentToRaj(server);
+    await reportBreakdown(server);
+
+    const reassignment = await request(server, {
+      method: 'POST',
+      path: '/api/shipments/SHP-1024/reassign',
+      body: { newDriverId: 'DRV-203' }
+    });
+    const shipment = await request(server, {
+      path: '/api/shipments/SHP-1024'
+    });
+    const exceptionHistory = await request(server, {
+      path: '/api/shipments/SHP-1024/exceptions'
+    });
+    const activeExceptions = await request(server, {
+      path: '/api/exceptions'
+    });
+
+    assert.equal(reassignment.statusCode, 200);
+    assert.deepEqual(reassignment.body.data.resolvedExceptionIds, [
+      'EX-002'
+    ]);
+    assert.equal(
+      reassignment.body.data.notification.template.bodyParameters[4].value,
+      formatTemplateDateTime(addDays(getSystemDate(), 2), '17:00')
+    );
+    assert.equal(shipment.body.data.status, 'SCHEDULED');
+    assert.equal(shipment.body.data.eta, '17:00');
+    assert.equal(shipment.body.data.delayMinutes, 0);
+    assert.deepEqual(shipment.body.data.exceptions, []);
+    assert.equal(shipment.body.data.driver.status, 'ASSIGNED');
+    assert.equal(shipment.body.data.driver.currentShipmentId, null);
+    assert.equal(shipment.body.data.driver.nextShipmentId, 'SHP-1024');
+    assert.equal(exceptionHistory.body.count, 1);
+    assert.equal(exceptionHistory.body.data[0].status, 'RESOLVED');
+    assert.equal(
+      exceptionHistory.body.data[0].resolutionReason,
+      'SHIPMENT_REASSIGNED'
+    );
+    assert.match(
+      exceptionHistory.body.data[0].resolvedAt,
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/
+    );
+    assert.equal(
+      activeExceptions.body.data.some(
+        (exception) => exception.exceptionId === 'EX-002'
+      ),
+      false
+    );
+  });
+
+  await t.test('restores an in-transit shipment after reassignment', async () => {
+    await resetDemo(server);
+    await request(server, {
+      method: 'POST',
+      path: '/api/shipments/SHP-1050/exceptions',
+      body: {
+        driverId: 'DRV-304',
+        type: 'DELAY',
+        delayMinutes: 30
+      }
+    });
+
+    const reassignment = await request(server, {
+      method: 'POST',
+      path: '/api/shipments/SHP-1050/reassign',
+      body: { newDriverId: 'DRV-203' }
+    });
+    const shipment = await request(server, {
+      path: '/api/shipments/SHP-1050'
+    });
+    const previousDriver = await request(server, {
+      path: '/api/drivers/DRV-304/current-trip'
+    });
+
+    assert.equal(reassignment.statusCode, 200);
+    assert.equal(shipment.body.data.status, 'IN_TRANSIT');
+    assert.equal(shipment.body.data.eta, '14:00');
+    assert.equal(shipment.body.data.driver.status, 'ON_TRIP');
+    assert.equal(shipment.body.data.driver.currentShipmentId, 'SHP-1050');
+    assert.deepEqual(shipment.body.data.exceptions, []);
+    assert.equal(previousDriver.body.data.driver.status, 'AVAILABLE');
+    assert.equal(previousDriver.body.data.shipment, null);
+  });
+
+  await t.test('sends the load assignment template after reassignment', async (t) => {
+    const originalFetch = globalThis.fetch;
+    const originalConsoleLog = console.log;
+    const originalEnvironment = {
+      enabled: process.env.WHATSAPP_NOTIFICATIONS_ENABLED,
+      token: process.env.WHATSAPP_ACCESS_TOKEN,
+      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
+      graphApiVersion: process.env.WHATSAPP_GRAPH_API_VERSION,
+      headerImageUrl: process.env.WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL
+    };
+    const calls = [];
+    const infoLogs = [];
+
+    t.after(() => {
+      globalThis.fetch = originalFetch;
+      console.log = originalConsoleLog;
+
+      for (const [name, value] of [
+        ['WHATSAPP_NOTIFICATIONS_ENABLED', originalEnvironment.enabled],
+        ['WHATSAPP_ACCESS_TOKEN', originalEnvironment.token],
+        ['WHATSAPP_PHONE_NUMBER_ID', originalEnvironment.phoneNumberId],
+        ['WHATSAPP_GRAPH_API_VERSION', originalEnvironment.graphApiVersion],
+        [
+          'WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL',
+          originalEnvironment.headerImageUrl
+        ]
+      ]) {
+        if (value === undefined) {
+          delete process.env[name];
+        } else {
+          process.env[name] = value;
+        }
+      }
+    });
+
+    process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'true';
+    process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-number-id';
+    process.env.WHATSAPP_GRAPH_API_VERSION = 'v25.0';
+    process.env.WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL =
+      'https://logistics.example/images/load-assignment-header.png';
+    console.log = (message) => infoLogs.push(message);
+    globalThis.fetch = async (url, options) => {
+      calls.push({ url, options });
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ messages: [{ id: 'wamid.reassignment-1' }] })
+      };
+    };
+
+    await resetDemo(server);
+    const reassignment = await reassignToAmit(server, {
+      'x-request-id': 'reassign-request-123'
+    });
+
+    assert.equal(reassignment.statusCode, 200);
+    assert.deepEqual(reassignment.body.data.notificationDelivery, {
+      status: 'ACCEPTED_BY_META',
+      attemptedAt: reassignment.body.data.notificationDelivery.attemptedAt,
+      messageId: 'wamid.reassignment-1'
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(
+      calls[0].url,
+      'https://graph.facebook.com/v25.0/test-phone-number-id/messages'
+    );
+
+    const message = JSON.parse(calls[0].options.body);
+    assert.equal(message.to, '918329216051');
+    assert.equal(message.template.name, 'new_load_assignment_v1');
+    assert.deepEqual(
+      message.template.components[1].parameters.map((item) => item.text),
+      [
+        'SHP-1088',
+        'Bengaluru Logistics Park',
+        'Chennai Distribution Center',
+        formatTemplateDateTime(getSystemDate(), '19:00'),
+        formatTemplateDateTime(addDays(getSystemDate(), 1), '05:00')
+      ]
+    );
+    assert.equal(infoLogs.length, 1);
+    assert.equal(
+      JSON.parse(infoLogs[0]).requestId,
+      'reassign-request-123'
+    );
+  });
+
+  await t.test('does not reassign with incomplete notification data', async () => {
+    await resetDemo(server);
+    repository.getDriverById('DRV-203').phone = null;
+
+    const reassignment = await reassignToAmit(server);
+    const shipment = await request(server, {
+      path: '/api/shipments/SHP-1088'
+    });
+
+    assert.equal(reassignment.statusCode, 422);
+    assert.equal(
+      reassignment.body.error.code,
+      'ASSIGNMENT_NOTIFICATION_DATA_INCOMPLETE'
+    );
+    assert.equal(shipment.body.data.driverId, null);
+    assert.equal(shipment.body.data.assignment, null);
   });
 
   await t.test('restores every mutation to the original seed state', async () => {

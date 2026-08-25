@@ -1,4 +1,7 @@
 const repository = require('../repositories/mock-logistics.repository');
+const {
+  buildAssignmentNotification
+} = require('./assignment.service');
 const AppError = require('../utils/app-error');
 
 const SHIPMENT_STATUSES = ['SCHEDULED', 'IN_TRANSIT', 'DELAYED'];
@@ -26,7 +29,11 @@ function getShipmentDetails(shipmentId) {
     repository.getAssignmentByShipmentId(shipment.shipmentId) || null;
   const exceptions = repository
     .getExceptions()
-    .filter((item) => item.shipmentId === shipment.shipmentId);
+    .filter(
+      (item) =>
+        item.shipmentId === shipment.shipmentId &&
+        item.status === 'ACTIVE'
+    );
 
   return {
     ...shipment,
@@ -218,6 +225,37 @@ function getAvailableDrivers(shipmentId) {
     }));
 }
 
+function getStatusBeforeActiveDelay(shipment, previousDriver) {
+  if (
+    previousDriver &&
+    previousDriver.currentShipmentId === shipment.shipmentId
+  ) {
+    return 'IN_TRANSIT';
+  }
+
+  return 'SCHEDULED';
+}
+
+function getReassignmentShipmentState(
+  shipment,
+  previousDriver,
+  activeExceptions
+) {
+  if (shipment.status !== 'DELAYED' || activeExceptions.length === 0) {
+    return {
+      status: shipment.status,
+      eta: shipment.eta,
+      delayMinutes: shipment.delayMinutes
+    };
+  }
+
+  return {
+    status: getStatusBeforeActiveDelay(shipment, previousDriver),
+    eta: shipment.originalEta || shipment.eta,
+    delayMinutes: 0
+  };
+}
+
 function reassignShipment(shipmentId, input) {
   const shipment = requireShipment(shipmentId);
   const newDriverId = input && input.newDriverId;
@@ -256,6 +294,37 @@ function reassignShipment(shipmentId, input) {
   const previousDriver = previousDriverId
     ? repository.getDriverById(previousDriverId)
     : null;
+  const activeExceptions = repository
+    .getExceptions()
+    .filter(
+      (exception) =>
+        exception.shipmentId === shipmentId &&
+        exception.status === 'ACTIVE'
+    );
+  const reassignmentShipmentState = getReassignmentShipmentState(
+    shipment,
+    previousDriver,
+    activeExceptions
+  );
+
+  // Validate the outbound template against the post-reassignment ETA before
+  // changing the shipment, exceptions, assignment, or either driver's state.
+  const notification = buildAssignmentNotification(
+    {
+      ...shipment,
+      ...reassignmentShipmentState
+    },
+    newDriver
+  );
+  const resolvedAt = new Date().toISOString();
+
+  activeExceptions.forEach((exception) => {
+    exception.status = 'RESOLVED';
+    exception.resolvedAt = resolvedAt;
+    exception.resolutionReason = 'SHIPMENT_REASSIGNED';
+  });
+
+  Object.assign(shipment, reassignmentShipmentState);
   let assignment = repository.getAssignmentByShipmentId(shipmentId);
 
   if (!assignment) {
@@ -280,7 +349,7 @@ function reassignShipment(shipmentId, input) {
       previousDriver.nextShipmentId = null;
     }
     if (
-      previousDriver.status === 'ASSIGNED' &&
+      ['ASSIGNED', 'ON_TRIP'].includes(previousDriver.status) &&
       !previousDriver.currentShipmentId &&
       !previousDriver.nextShipmentId
     ) {
@@ -298,7 +367,11 @@ function reassignShipment(shipmentId, input) {
 
   return {
     ...assignment,
-    previousDriverId
+    previousDriverId,
+    resolvedExceptionIds: activeExceptions.map(
+      (exception) => exception.exceptionId
+    ),
+    notification
   };
 }
 

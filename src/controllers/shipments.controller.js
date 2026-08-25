@@ -1,4 +1,5 @@
 const shipmentService = require('../services/shipment.service');
+const whatsappService = require('../services/whatsapp.service');
 
 function getTodaysSummary(req, res) {
   return res.json({
@@ -36,12 +37,23 @@ function getAvailableDrivers(req, res) {
   return res.json({ data, count: data.length });
 }
 
-function reassignShipment(req, res) {
+async function reassignShipment(req, res) {
+  const result = shipmentService.reassignShipment(
+    req.params.shipmentId,
+    req.body
+  );
+  const notificationDelivery =
+    await whatsappService.sendAssignmentNotification(result.notification, {
+      requestId: req.get('Rndr-Id') || req.get('X-Request-Id') || null,
+      shipmentId: result.shipmentId,
+      driverId: result.driverId
+    });
+
   return res.json({
-    data: shipmentService.reassignShipment(
-      req.params.shipmentId,
-      req.body
-    )
+    data: {
+      ...result,
+      notificationDelivery
+    }
   });
 }
 

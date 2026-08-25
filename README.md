@@ -269,7 +269,7 @@ replacement for authenticating the connector in production.
 | POST | `/api/shipments/:shipmentId/exceptions` | Record a driver-reported exception |
 | GET | `/api/shipments/:shipmentId/impact` | Mock direct or downstream risk supplied by the backend |
 | GET | `/api/shipments/:shipmentId/available-drivers` | Mock driver availability |
-| POST | `/api/shipments/:shipmentId/reassign` | Perform a confirmed reassignment |
+| POST | `/api/shipments/:shipmentId/reassign` | Reassign and notify the new driver |
 | GET | `/api/drivers/:driverId/current-trip` | Driver's current shipment context |
 | GET | `/api/drivers/:driverId/assignments` | Ordered current/upcoming assignments |
 | POST | `/api/assignments/:shipmentId/respond` | Accept or reject a pending assignment |
@@ -459,8 +459,11 @@ The intentionally simple mock rules are:
   Delays of 60 minutes or more are `HIGH`; shorter delays are `MEDIUM`.
 - A driver is available when seed status is `AVAILABLE` and `availableFrom`
   is no later than the shipment pickup time.
-- Reassignment updates the shipment, assignment, old driver, and new driver in
-  one in-memory operation.
+- Reassignment validates the load-assignment notification, updates the
+  shipment, assignment, old driver, and new driver in one in-memory operation,
+  resolves the shipment's active exceptions, and restores the original ETA and
+  pre-delay status. It then sends `new_load_assignment_v1` to the new driver
+  when notifications are enabled.
 - Exception reporting requires the supplied driver to be assigned to the
   shipment.
 
@@ -532,6 +535,12 @@ curl -X POST http://localhost:3000/api/shipments/SHP-1024/reassign \
   -d '{"newDriverId":"DRV-203"}'
 ```
 
+The response includes `data.notification` and `data.notificationDelivery`,
+using the same load-assignment template and delivery statuses as a new
+assignment. It also returns `data.resolvedExceptionIds`. Resolved exceptions
+are removed from the shipment's active `exceptions` list but remain available
+as `RESOLVED` history from `/api/shipments/:shipmentId/exceptions`.
+
 9. Verify the shipment and Amit's assignment:
 
 ```bash
@@ -590,8 +599,9 @@ WHATSAPP_EXCEPTION_HEADER_IMAGE_URL=https://logistics-mba-demo.onrender.com/imag
 WHATSAPP_NOTIFICATIONS_ENABLED=true
 ```
 
-Load assignments use the assigned driver's existing `phone` field. Driver
-exception alerts use the first `DISPATCHER` persona in `seed/users.json`.
+New and reassigned load assignments use the assigned driver's existing `phone`
+field. Driver exception alerts use the first `DISPATCHER` persona in
+`seed/users.json`.
 Fictional phone numbers will be rejected by Meta, and a Meta test sender can
 send only to recipients allowed in the app dashboard. The Cloud API request is:
 

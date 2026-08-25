@@ -424,6 +424,7 @@ function respondToAssignment(shipmentId, input) {
 }
 
 module.exports = {
+  buildAssignmentNotification,
   createAssignment,
   respondToAssignment
 };
