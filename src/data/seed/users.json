@@ -6,6 +6,12 @@
     "name": "Raj"
   },
   {
+    "whatsappPhone": "918329216051",
+    "role": "DRIVER",
+    "entityId": "DRV-203",
+    "name": "Amit"
+  },
+  {
     "whatsappPhone": "919511758488",
     "role": "DISPATCHER",
     "entityId": "DSP-001",

@@ -160,6 +160,7 @@ number against the fictional mappings in `src/data/seed/users.json`:
 | Demo phone | Role | Entity | Name |
 |---|---|---|---|
 | `919823784110` | `DRIVER` | `DRV-101` | Raj |
+| `918329216051` | `DRIVER` | `DRV-203` | Amit |
 | `919511758488` | `DISPATCHER` | `DSP-001` | Anita |
 
 These formatted Driver values all resolve to the same persona:
@@ -328,7 +329,7 @@ and a notification-ready payload. For example:
       "channel": "WHATSAPP",
       "recipient": {
         "driverId": "DRV-203",
-        "phone": "+15550000203"
+        "phone": "+918329216051"
       },
       "template": {
         "name": "new_load_assignment_v1",
@@ -657,7 +658,7 @@ and complete recipient phone numbers are never logged. Example:
   "eventId": "ASSIGN-0001",
   "shipmentId": "SHP-1092",
   "driverId": "DRV-203",
-  "recipient": "*******0203",
+  "recipient": "********6051",
   "templateName": "new_load_assignment_v1",
   "templateLanguage": "en_US",
   "code": "132001",

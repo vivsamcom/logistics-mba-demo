@@ -273,7 +273,7 @@ test('mock logistics demo APIs', async (t) => {
       channel: 'WHATSAPP',
       recipient: {
         driverId: 'DRV-203',
-        phone: '+15550000203'
+        phone: '+918329216051'
       },
       template: {
         name: 'new_load_assignment_v1',
@@ -577,7 +577,7 @@ test('mock logistics demo APIs', async (t) => {
       eventId: 'ASSIGN-0001',
       shipmentId: 'SHP-1092',
       driverId: 'DRV-203',
-      recipient: '*******0203',
+      recipient: '********6051',
       templateName: 'new_load_assignment_v1',
       templateLanguage: 'en_US',
       code: '132001',

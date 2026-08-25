@@ -13,6 +13,7 @@ const app = require('../src/app');
 const { normalizePhone } = require('../src/utils/phone');
 
 const DRIVER_PHONE = '919823784110';
+const AMIT_PHONE = '918329216051';
 const DISPATCHER_PHONE = '919511758488';
 
 function request(
@@ -126,6 +127,20 @@ test('persona-aware MBA APIs', async (t) => {
       name: 'Raj'
     });
     assert.equal(response.body.data.whatsappPhone, undefined);
+  });
+
+  await t.test('resolves DRV-203 from Amit\'s WhatsApp number', async () => {
+    const response = await request(server, {
+      path: '/api/me/persona',
+      headers: personaHeaders(AMIT_PHONE)
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.body.data, {
+      role: 'DRIVER',
+      entityId: 'DRV-203',
+      name: 'Amit'
+    });
   });
 
   await t.test('uses the resolved Driver for self-service reads', async () => {
