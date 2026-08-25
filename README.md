@@ -1,8 +1,9 @@
 # logistics-mba-demo
 
 `logistics-mba-demo` is a Node.js/Express service for a generic logistics and
-Meta Business Agent demo. It contains a WhatsApp Business Platform webhook
-foundation and a small, resettable mock transportation backend.
+Meta Business Agent demo. It contains a WhatsApp Business Platform webhook,
+an outbound load-assignment template adapter, and a small, resettable mock
+transportation backend.
 
 The service represents a vendor-neutral integration boundary that could later
 connect to a transportation management system (TMS), fleet management system
@@ -18,6 +19,7 @@ system. It does not reproduce or claim to expose any vendor's product APIs.
 - Mock drivers, shipments, assignment events, and exceptions
   held in memory
 - Idempotent load-assignment creation
+- Optional outbound `new_load_assignment_v1` WhatsApp utility notifications
 - Driver current-trip and assignment APIs
 - Shipment summary, delayed-shipment, exception, impact, and available-driver
   APIs
@@ -37,12 +39,12 @@ resources are not implemented in the current codebase.
 ```text
 WhatsApp Business Platform
           |
-          | webhook / future Cloud API
+          | webhook / Cloud API
           v
 +----------------------------------------------------+
 | logistics-mba-demo (one Express application)      |
 |                                                    |
-| WhatsApp webhook                                   |
+| WhatsApp webhook + outbound template adapter       |
 | Logistics routes -> services -> in-memory store   |
 |                                  ^                 |
 |                                  | reset/copy      |
@@ -94,10 +96,14 @@ META_SIGNATURE_VALIDATION_ENABLED=false
 WHATSAPP_ACCESS_TOKEN=
 WHATSAPP_PHONE_NUMBER_ID=
 WHATSAPP_BUSINESS_ACCOUNT_ID=
+WHATSAPP_GRAPH_API_VERSION=
+WHATSAPP_NOTIFICATIONS_ENABLED=false
 ```
 
-Never commit `.env`. The WhatsApp access token and account/phone IDs remain
-placeholders for a future outbound messaging phase.
+Never commit `.env`. Set `WHATSAPP_NOTIFICATIONS_ENABLED=true` only after the
+access token, sender phone-number ID, and a currently supported Graph API
+version are configured. `WHATSAPP_BUSINESS_ACCOUNT_ID` is not used by the send
+call, but remains available for template-management operations.
 
 ## API response conventions
 
@@ -247,9 +253,9 @@ availability from the backend rather than calculating them itself.
 
 `POST /api/assignments` creates an assignment for an unassigned shipment. It
 updates the shipment, creates a pending assignment, updates the driver's
-current or next shipment, and records a `LOAD_ASSIGNED` event for the future
-outbound notification adapter. The endpoint does not send WhatsApp messages
-yet.
+current or next shipment, records a `LOAD_ASSIGNED` event, and sends the
+approved `new_load_assignment_v1` template when WhatsApp notifications are
+enabled.
 
 Request:
 
@@ -321,6 +327,11 @@ and a notification-ready payload. For example:
           }
         ]
       }
+    },
+    "notificationDelivery": {
+      "status": "ACCEPTED_BY_META",
+      "attemptedAt": "2026-08-21T10:30:01.000Z",
+      "messageId": "wamid.example"
     }
   }
 }
@@ -329,27 +340,29 @@ and a notification-ready payload. For example:
 The parameter positions map directly to the utility template:
 
 ```text
-New shipment assigned
-
+🚛 New shipment assigned
 Shipment {{1}} has been assigned to you.
-
-Pickup: {{2}}
-Delivery: {{3}}
-Pickup Date & Time: {{4}}
-Expected Delivery Date & Time: {{5}}
+📍 Pickup: {{2}}
+🏁 Delivery: {{3}}
+📆 Pickup Date & Time: {{4}}
+🕒 Expected Delivery Date & Time: {{5}}
 
 Please review and confirm the assignment.
-
-Quick Reply buttons (configured separately from the body):
-1. Accept
-2. Reject
 ```
 
 The service validates the driver's phone number and all five body parameter
-values before changing assignment state. Button payloads include the action,
-shipment ID, and driver ID needed to correlate a future webhook reply. The
-future WhatsApp adapter will still need to map this object to Meta's wire
-format, send it with the configured credentials, and process the callback.
+values before changing assignment state. The outbound adapter removes display
+formatting from the recipient number, preserves parameter order, and maps only
+the five body values to Meta's template wire format. Existing button metadata
+is retained in the API response for compatibility, but is not sent because the
+currently approved template is body-only.
+
+Meta accepting a request is recorded as `ACCEPTED_BY_META` with its `wamid`;
+actual delivery statuses continue to arrive through the webhook. A Meta or
+configuration error is returned as `notificationDelivery.status: FAILED`
+without rolling back the assignment. Repeating the same idempotent event
+retries a failed send and does not repeat an already accepted send. When
+outbound notifications are disabled, the status is `SKIPPED`.
 
 Assignment event records are in memory and are cleared by
 `POST /api/demo/reset`. The caller is treated as the assignment
@@ -538,6 +551,61 @@ the HMAC against `req.rawBody`, the exact received bytes. It intentionally does
 not use `JSON.stringify(req.body)`, which can change formatting and invalidate
 a legitimate Meta signature.
 
+## WhatsApp utility notifications
+
+Configure the sender credentials in `.env` or in the deployment environment:
+
+```env
+WHATSAPP_ACCESS_TOKEN=<system-user-token-with-whatsapp_business_messaging>
+WHATSAPP_PHONE_NUMBER_ID=<meta-sender-phone-number-id>
+WHATSAPP_GRAPH_API_VERSION=<supported-version-shown-by-meta>
+WHATSAPP_NOTIFICATIONS_ENABLED=true
+```
+
+The recipient comes from the assigned driver's existing `phone` field. Seed
+phone numbers are intentionally unchanged; fictional numbers will be rejected
+by Meta, and a Meta test sender can send only to recipients allowed in the app
+dashboard. The Cloud API request is:
+
+```text
+POST https://graph.facebook.com/{version}/{phone-number-id}/messages
+```
+
+### Render diagnostics
+
+Outbound results are written as single-line structured JSON to stdout/stderr,
+so they appear in the Render service's **Logs** page. Search for either event:
+
+- `whatsapp.assignment.accepted`
+- `whatsapp.assignment.failed`
+
+A failure log contains the assignment event, shipment, driver, masked recipient,
+template name/language, HTTP status, Meta error code/subcode/details, Meta trace
+and request IDs, and Render's `Rndr-Id` request correlation value. Access tokens
+and complete recipient phone numbers are never logged. Example:
+
+```json
+{
+  "level": "error",
+  "event": "whatsapp.assignment.failed",
+  "requestId": "render-request-id",
+  "eventId": "ASSIGN-0001",
+  "shipmentId": "SHP-1092",
+  "driverId": "DRV-203",
+  "recipient": "*******0203",
+  "templateName": "new_load_assignment_v1",
+  "templateLanguage": "en_US",
+  "code": "132001",
+  "message": "Template does not exist in the specified language",
+  "httpStatus": 400,
+  "meta": {
+    "subcode": "2494073",
+    "traceId": "meta-trace-id",
+    "requestId": "meta-request-id"
+  }
+}
+```
+
 ## Tests and deployment
 
 Run all webhook and mock logistics tests with:
@@ -550,7 +618,7 @@ The service remains suitable for one future Render Web Service: it uses
 `process.env.PORT`, exposes `/health`, stores secrets in environment variables,
 does not hardcode its callback host, and does not write runtime state to disk.
 
-A future phase can add outbound WhatsApp Utility template notifications for
-the recorded `LOAD_ASSIGNED` event and exception events. MBA connector
-schemas/configuration can map to the generic REST APIs while transportation
-decisions remain in the backend or its future platform adapter.
+A future phase can add outbound notifications for exception events and process
+assignment confirmation replies. MBA connector schemas/configuration can map
+to the generic REST APIs while transportation decisions remain in the backend
+or its future platform adapter.

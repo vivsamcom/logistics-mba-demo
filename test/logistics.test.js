@@ -5,11 +5,15 @@ const { once } = require('node:events');
 
 process.env.NODE_ENV = 'test';
 process.env.META_SIGNATURE_VALIDATION_ENABLED = 'false';
+process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'false';
 
 const app = require('../src/app');
 const repository = require('../src/repositories/mock-logistics.repository');
 
-function request(server, { method = 'GET', path = '/', body }) {
+function request(
+  server,
+  { method = 'GET', path = '/', headers = {}, body }
+) {
   const address = server.address();
   const bodyBuffer = body === undefined
     ? null
@@ -25,9 +29,10 @@ function request(server, { method = 'GET', path = '/', body }) {
         headers: bodyBuffer
           ? {
               'content-type': 'application/json',
-              'content-length': bodyBuffer.length
+              'content-length': bodyBuffer.length,
+              ...headers
             }
-          : undefined
+          : headers
       },
       (res) => {
         const chunks = [];
@@ -118,10 +123,11 @@ function reassignToAmit(server) {
   });
 }
 
-function createLoadAssignment(server, overrides = {}) {
+function createLoadAssignment(server, overrides = {}, headers = {}) {
   return request(server, {
     method: 'POST',
     path: '/api/assignments',
+    headers,
     body: {
       eventId: 'ASSIGN-0001',
       shipmentId: 'SHP-1092',
@@ -334,6 +340,217 @@ test('mock logistics demo APIs', async (t) => {
       created.body.data.notification
     );
     assert.equal(driverAssignments.body.count, 1);
+  });
+
+  await t.test('sends the assignment template once through Meta', async (t) => {
+    const originalFetch = globalThis.fetch;
+    const originalConsoleLog = console.log;
+    const originalEnvironment = {
+      enabled: process.env.WHATSAPP_NOTIFICATIONS_ENABLED,
+      token: process.env.WHATSAPP_ACCESS_TOKEN,
+      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
+      graphApiVersion: process.env.WHATSAPP_GRAPH_API_VERSION
+    };
+    const calls = [];
+    const infoLogs = [];
+
+    t.after(() => {
+      globalThis.fetch = originalFetch;
+      console.log = originalConsoleLog;
+      process.env.WHATSAPP_NOTIFICATIONS_ENABLED =
+        originalEnvironment.enabled;
+
+      for (const [name, value] of [
+        ['WHATSAPP_ACCESS_TOKEN', originalEnvironment.token],
+        ['WHATSAPP_PHONE_NUMBER_ID', originalEnvironment.phoneNumberId],
+        ['WHATSAPP_GRAPH_API_VERSION', originalEnvironment.graphApiVersion]
+      ]) {
+        if (value === undefined) {
+          delete process.env[name];
+        } else {
+          process.env[name] = value;
+        }
+      }
+    });
+
+    process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'true';
+    process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-number-id';
+    process.env.WHATSAPP_GRAPH_API_VERSION = 'v25.0';
+    console.log = (message) => infoLogs.push(message);
+    globalThis.fetch = async (url, options) => {
+      calls.push({ url, options });
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ messages: [{ id: 'wamid.assignment-1' }] })
+      };
+    };
+
+    await resetDemo(server);
+    const created = await createLoadAssignment(server);
+    const retried = await createLoadAssignment(server);
+
+    assert.equal(created.statusCode, 201);
+    assert.deepEqual(created.body.data.notificationDelivery, {
+      status: 'ACCEPTED_BY_META',
+      attemptedAt: created.body.data.notificationDelivery.attemptedAt,
+      messageId: 'wamid.assignment-1'
+    });
+    assert.equal(retried.statusCode, 200);
+    assert.equal(
+      retried.body.data.notificationDelivery.messageId,
+      'wamid.assignment-1'
+    );
+    assert.equal(calls.length, 1);
+    assert.equal(infoLogs.length, 1);
+    assert.equal(
+      JSON.parse(infoLogs[0]).event,
+      'whatsapp.assignment.accepted'
+    );
+    assert.equal(
+      calls[0].url,
+      'https://graph.facebook.com/v25.0/test-phone-number-id/messages'
+    );
+    assert.equal(
+      calls[0].options.headers.Authorization,
+      'Bearer test-access-token'
+    );
+    assert.deepEqual(JSON.parse(calls[0].options.body), {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: '15550000203',
+      type: 'template',
+      template: {
+        name: 'new_load_assignment_v1',
+        language: { code: 'en_US' },
+        components: [
+          {
+            type: 'body',
+            parameters: [
+              { type: 'text', text: 'SHP-1092' },
+              { type: 'text', text: 'Chennai Port' },
+              {
+                type: 'text',
+                text: 'Hyderabad Distribution Center'
+              },
+              {
+                type: 'text',
+                text: formatTemplateDateTime(getSystemDate(), '15:00')
+              },
+              {
+                type: 'text',
+                text: formatTemplateDateTime(getSystemDate(), '23:00')
+              }
+            ]
+          }
+        ]
+      }
+    });
+  });
+
+  await t.test('keeps the assignment when Meta rejects the message', async (t) => {
+    const originalFetch = globalThis.fetch;
+    const originalConsoleError = console.error;
+    const originalEnabled = process.env.WHATSAPP_NOTIFICATIONS_ENABLED;
+    const originalToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    const originalPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const originalGraphApiVersion = process.env.WHATSAPP_GRAPH_API_VERSION;
+    const errorLogs = [];
+
+    t.after(() => {
+      globalThis.fetch = originalFetch;
+      console.error = originalConsoleError;
+      process.env.WHATSAPP_NOTIFICATIONS_ENABLED = originalEnabled;
+
+      const environment = {
+        WHATSAPP_ACCESS_TOKEN: originalToken,
+        WHATSAPP_PHONE_NUMBER_ID: originalPhoneNumberId,
+        WHATSAPP_GRAPH_API_VERSION: originalGraphApiVersion
+      };
+
+      for (const [name, value] of Object.entries(environment)) {
+        if (value === undefined) {
+          delete process.env[name];
+        } else {
+          process.env[name] = value;
+        }
+      }
+    });
+
+    process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'true';
+    process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-number-id';
+    process.env.WHATSAPP_GRAPH_API_VERSION = 'v25.0';
+    console.error = (message) => errorLogs.push(message);
+    globalThis.fetch = async () => ({
+      ok: false,
+      status: 400,
+      headers: {
+        get: (name) =>
+          name === 'x-fb-request-id' ? 'meta-request-456' : null
+      },
+      json: async () => ({
+        error: {
+          code: 132001,
+          error_subcode: 2494073,
+          type: 'OAuthException',
+          message: 'Template does not exist in the specified language',
+          error_data: { details: 'template name or language mismatch' },
+          fbtrace_id: 'meta-trace-789'
+        }
+      })
+    });
+
+    await resetDemo(server);
+    const created = await createLoadAssignment(
+      server,
+      {},
+      { 'rndr-id': 'render-request-123' }
+    );
+    const shipment = await request(server, {
+      path: '/api/shipments/SHP-1092'
+    });
+
+    assert.equal(created.statusCode, 201);
+    assert.equal(created.body.data.notificationDelivery.status, 'FAILED');
+    assert.equal(
+      created.body.data.notificationDelivery.error.code,
+      '132001'
+    );
+    assert.equal(
+      created.body.data.notificationDelivery.error.httpStatus,
+      400
+    );
+    assert.equal(shipment.body.data.driverId, 'DRV-203');
+    assert.equal(shipment.body.data.assignment.status, 'ASSIGNED');
+
+    assert.equal(errorLogs.length, 1);
+    const log = JSON.parse(errorLogs[0]);
+    assert.deepEqual(log, {
+      level: 'error',
+      event: 'whatsapp.assignment.failed',
+      timestamp: log.timestamp,
+      requestId: 'render-request-123',
+      eventId: 'ASSIGN-0001',
+      shipmentId: 'SHP-1092',
+      driverId: 'DRV-203',
+      recipient: '*******0203',
+      templateName: 'new_load_assignment_v1',
+      templateLanguage: 'en_US',
+      code: '132001',
+      message: 'Template does not exist in the specified language',
+      httpStatus: 400,
+      meta: {
+        type: 'OAuthException',
+        subcode: '2494073',
+        details: 'template name or language mismatch',
+        traceId: 'meta-trace-789',
+        requestId: 'meta-request-456'
+      }
+    });
+    assert.equal(errorLogs[0].includes('test-access-token'), false);
   });
 
   await t.test('rejects conflicting events and existing assignments', async () => {

@@ -8,6 +8,13 @@ function isMetaSignatureValidationEnabled() {
     .toLowerCase() === 'true';
 }
 
+function isWhatsAppNotificationsEnabled() {
+  return String(process.env.WHATSAPP_NOTIFICATIONS_ENABLED)
+    .trim()
+    .toLowerCase() === 'true';
+}
+
 module.exports = {
-  isMetaSignatureValidationEnabled
+  isMetaSignatureValidationEnabled,
+  isWhatsAppNotificationsEnabled
 };
