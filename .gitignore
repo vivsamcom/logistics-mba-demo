@@ -2,6 +2,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+*.local.ps1
 npm-debug.log*
 coverage/
 .DS_Store

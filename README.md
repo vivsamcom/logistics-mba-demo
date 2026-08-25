@@ -82,6 +82,25 @@ npm start
 
 The default URL is `http://localhost:3000`.
 
+## Public WhatsApp images
+
+The service exposes the PNG files in `public/images` without authentication:
+
+- `/images/breakdown-image.png`
+- `/images/load-assignment-header.png`
+
+Locally, for example, the load-assignment header is available at
+`http://localhost:3000/images/load-assignment-header.png`. After deploying the
+service behind a public HTTPS domain, use URLs such as:
+
+```text
+https://your-domain.com/images/breakdown-image.png
+https://your-domain.com/images/load-assignment-header.png
+```
+
+These image requests do not require an API key or access token. The deployed
+domain itself must be publicly reachable so Meta can download the image.
+
 ## Environment variables
 
 ```env

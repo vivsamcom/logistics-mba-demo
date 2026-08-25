@@ -1,3 +1,4 @@
+const path = require('node:path');
 const express = require('express');
 const webhookRoutes = require('./routes/webhook.routes');
 const shipmentRoutes = require('./routes/shipments.routes');
@@ -12,6 +13,8 @@ const errorHandler = require('./middleware/error-handler');
 const app = express();
 
 app.disable('x-powered-by');
+
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.use(
   express.json({
