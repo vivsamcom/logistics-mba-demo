@@ -1,6 +1,8 @@
 const repository = require('../repositories/mock-logistics.repository');
 const AppError = require('../utils/app-error');
 
+const SHIPMENT_STATUSES = ['SCHEDULED', 'IN_TRANSIT', 'DELAYED'];
+
 function requireShipment(shipmentId) {
   const shipment = repository.getShipmentById(shipmentId);
 
@@ -73,6 +75,24 @@ function getDelayedShipments() {
   return repository
     .getShipments()
     .filter((shipment) => shipment.status === 'DELAYED')
+    .map((shipment) => getShipmentDetails(shipment.shipmentId));
+}
+
+function getShipmentsByStatus(status) {
+  const normalizedStatus =
+    typeof status === 'string' ? status.trim().toUpperCase() : '';
+
+  if (!SHIPMENT_STATUSES.includes(normalizedStatus)) {
+    throw new AppError(
+      400,
+      'INVALID_SHIPMENT_STATUS',
+      `status must be one of: ${SHIPMENT_STATUSES.join(', ')}`
+    );
+  }
+
+  return repository
+    .getShipments()
+    .filter((shipment) => shipment.status === normalizedStatus)
     .map((shipment) => getShipmentDetails(shipment.shipmentId));
 }
 
@@ -287,6 +307,7 @@ module.exports = {
   getShipmentDetails,
   getTodaysSummary,
   getDelayedShipments,
+  getShipmentsByStatus,
   getShipmentExceptions,
   getShipmentImpact,
   getAvailableDrivers,

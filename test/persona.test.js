@@ -459,6 +459,46 @@ test('persona-aware MBA APIs', async (t) => {
     );
   });
 
+  await t.test('filters Dispatcher shipments by normalized status', async () => {
+    await resetDemo(server);
+    const headers = personaHeaders(DISPATCHER_PHONE);
+    const response = await request(server, {
+      path: '/api/dispatcher/shipments?status=in_transit',
+      headers
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.count, 1);
+    assert.equal(response.body.data[0].shipmentId, 'SHP-1050');
+    assert.equal(response.body.data[0].status, 'IN_TRANSIT');
+    assert.equal(response.body.data[0].driver.driverId, 'DRV-304');
+    assert.equal(response.body.data[0].assignment.status, 'ACCEPTED');
+    assert.deepEqual(response.body.data[0].exceptions, []);
+  });
+
+  await t.test('validates the Dispatcher shipment status filter', async () => {
+    const headers = personaHeaders(DISPATCHER_PHONE);
+    const missing = await request(server, {
+      path: '/api/dispatcher/shipments',
+      headers
+    });
+    const invalid = await request(server, {
+      path: '/api/dispatcher/shipments?status=UNKNOWN',
+      headers
+    });
+
+    for (const response of [missing, invalid]) {
+      assert.equal(response.statusCode, 400);
+      assert.deepEqual(response.body, {
+        error: {
+          code: 'INVALID_SHIPMENT_STATUS',
+          message:
+            'status must be one of: SCHEDULED, IN_TRANSIT, DELAYED'
+        }
+      });
+    }
+  });
+
   await t.test('allows only a Dispatcher to reassign a shipment', async () => {
     await resetDemo(server);
     const response = await request(server, {

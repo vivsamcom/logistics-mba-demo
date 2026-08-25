@@ -13,6 +13,12 @@ function getDelayedShipments(req, res) {
   return res.json({ data, count: data.length });
 }
 
+function getShipments(req, res) {
+  const data = shipmentService.getShipmentsByStatus(req.query.status);
+
+  return res.json({ data, count: data.length });
+}
+
 function getExceptions(req, res) {
   const data = exceptionService.getExceptions(req.query.status || 'ACTIVE');
 
@@ -49,6 +55,7 @@ function reassignShipment(req, res) {
 module.exports = {
   getTodaysSummary,
   getDelayedShipments,
+  getShipments,
   getExceptions,
   getShipment,
   getShipmentImpact,

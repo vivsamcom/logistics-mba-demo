@@ -179,6 +179,7 @@ mock TMS endpoints:
 | POST | `/api/me/shipments/:shipmentId/exceptions` | Driver | Report an exception for the Driver's shipment |
 | GET | `/api/dispatcher/shipments/today` | Dispatcher | Current shipment summary |
 | GET | `/api/dispatcher/shipments/delayed` | Dispatcher | Delayed shipments |
+| GET | `/api/dispatcher/shipments?status=:status` | Dispatcher | Shipments filtered by `SCHEDULED`, `IN_TRANSIT`, or `DELAYED` |
 | GET | `/api/dispatcher/exceptions` | Dispatcher | Active or resolved fleet exceptions |
 | GET | `/api/dispatcher/shipments/:shipmentId` | Dispatcher | Shipment details |
 | GET | `/api/dispatcher/shipments/:shipmentId/impact` | Dispatcher | Direct or downstream impact from backend rules |
@@ -230,6 +231,9 @@ Dispatcher delayed shipments, impact, and available drivers:
 ```bash
 curl -H "X-WhatsApp-Phone: 919511758488" \
   http://localhost:3000/api/dispatcher/shipments/delayed
+
+curl -H "X-WhatsApp-Phone: 919511758488" \
+  "http://localhost:3000/api/dispatcher/shipments?status=IN_TRANSIT"
 
 curl -H "X-WhatsApp-Phone: 919511758488" \
   http://localhost:3000/api/dispatcher/shipments/SHP-1088/impact

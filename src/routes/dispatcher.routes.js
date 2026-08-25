@@ -16,6 +16,7 @@ router.get(
   '/shipments/delayed',
   routeHandler(controller.getDelayedShipments)
 );
+router.get('/shipments', routeHandler(controller.getShipments));
 router.get('/exceptions', routeHandler(controller.getExceptions));
 router.get(
   '/shipments/:shipmentId/impact',
