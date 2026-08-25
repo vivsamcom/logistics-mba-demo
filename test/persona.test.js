@@ -5,6 +5,9 @@ const { once } = require('node:events');
 
 process.env.NODE_ENV = 'test';
 process.env.META_SIGNATURE_VALIDATION_ENABLED = 'false';
+process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'false';
+process.env.WHATSAPP_EXCEPTION_HEADER_IMAGE_URL =
+  'https://logistics-mba-demo.onrender.com/images/breakdown-image.png';
 
 const app = require('../src/app');
 const { normalizePhone } = require('../src/utils/phone');
@@ -70,6 +73,35 @@ function resetDemo(server) {
   });
 }
 
+function assignShipmentToRaj(server) {
+  return request(server, {
+    method: 'POST',
+    path: '/api/assignments',
+    body: {
+      eventId: 'PERSONA-ASSIGN-1024',
+      shipmentId: 'SHP-1024',
+      driverId: 'DRV-101'
+    }
+  });
+}
+
+function reportRajException(server, headers = {}) {
+  return request(server, {
+    method: 'POST',
+    path: '/api/me/shipments/SHP-1024/exceptions',
+    headers: {
+      ...personaHeaders(DRIVER_PHONE),
+      ...headers
+    },
+    body: {
+      driverId: 'DRV-305',
+      type: 'VEHICLE_BREAKDOWN',
+      location: 'Near Pune',
+      delayMinutes: 90
+    }
+  });
+}
+
 test('persona-aware MBA APIs', async (t) => {
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -109,19 +141,18 @@ test('persona-aware MBA APIs', async (t) => {
 
     assert.equal(currentTrip.statusCode, 200);
     assert.equal(currentTrip.body.data.driver.driverId, 'DRV-101');
-    assert.equal(currentTrip.body.data.shipment.shipmentId, 'SHP-1024');
+    assert.equal(currentTrip.body.data.shipment, null);
+    assert.equal(currentTrip.body.data.assignment, null);
     assert.equal(assignments.statusCode, 200);
-    assert.deepEqual(
-      assignments.body.data.map((item) => item.shipmentId),
-      ['SHP-1024', 'SHP-1088']
-    );
+    assert.deepEqual(assignments.body.data, []);
   });
 
   await t.test('derives the Driver for assignment responses', async () => {
     await resetDemo(server);
+    await assignShipmentToRaj(server);
     const response = await request(server, {
       method: 'POST',
-      path: '/api/me/assignments/SHP-1088/respond',
+      path: '/api/me/assignments/SHP-1024/respond',
       headers: personaHeaders(DRIVER_PHONE),
       body: {
         driverId: 'DRV-305',
@@ -136,21 +167,210 @@ test('persona-aware MBA APIs', async (t) => {
 
   await t.test('derives the Driver when reporting an exception', async () => {
     await resetDemo(server);
-    const response = await request(server, {
-      method: 'POST',
-      path: '/api/me/shipments/SHP-1024/exceptions',
-      headers: personaHeaders(DRIVER_PHONE),
-      body: {
-        driverId: 'DRV-305',
-        type: 'VEHICLE_BREAKDOWN',
-        location: 'Near Pune',
-        delayMinutes: 90
-      }
-    });
+    await assignShipmentToRaj(server);
+    const response = await reportRajException(server);
 
     assert.equal(response.statusCode, 201);
     assert.equal(response.body.data.exception.driverId, 'DRV-101');
     assert.equal(response.body.data.shipment.status, 'DELAYED');
+    assert.equal(
+      response.body.data.notification.recipient.dispatcherId,
+      'DSP-001'
+    );
+    assert.deepEqual(response.body.data.notificationDelivery, {
+      status: 'SKIPPED',
+      reason: 'WHATSAPP_NOTIFICATIONS_DISABLED'
+    });
+  });
+
+  await t.test('sends the exception template to the Dispatcher', async (t) => {
+    const originalFetch = globalThis.fetch;
+    const originalConsoleLog = console.log;
+    const originalEnvironment = {
+      enabled: process.env.WHATSAPP_NOTIFICATIONS_ENABLED,
+      token: process.env.WHATSAPP_ACCESS_TOKEN,
+      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
+      graphApiVersion: process.env.WHATSAPP_GRAPH_API_VERSION,
+      headerImageUrl: process.env.WHATSAPP_EXCEPTION_HEADER_IMAGE_URL
+    };
+    const calls = [];
+    const logs = [];
+
+    t.after(() => {
+      globalThis.fetch = originalFetch;
+      console.log = originalConsoleLog;
+
+      for (const [name, value] of [
+        ['WHATSAPP_NOTIFICATIONS_ENABLED', originalEnvironment.enabled],
+        ['WHATSAPP_ACCESS_TOKEN', originalEnvironment.token],
+        ['WHATSAPP_PHONE_NUMBER_ID', originalEnvironment.phoneNumberId],
+        ['WHATSAPP_GRAPH_API_VERSION', originalEnvironment.graphApiVersion],
+        [
+          'WHATSAPP_EXCEPTION_HEADER_IMAGE_URL',
+          originalEnvironment.headerImageUrl
+        ]
+      ]) {
+        if (value === undefined) {
+          delete process.env[name];
+        } else {
+          process.env[name] = value;
+        }
+      }
+    });
+
+    process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'false';
+    await resetDemo(server);
+    await assignShipmentToRaj(server);
+
+    process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'true';
+    process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-number-id';
+    process.env.WHATSAPP_GRAPH_API_VERSION = 'v25.0';
+    process.env.WHATSAPP_EXCEPTION_HEADER_IMAGE_URL =
+      'https://logistics.example/images/breakdown-image.png';
+    console.log = (message) => logs.push(message);
+    globalThis.fetch = async (url, options) => {
+      calls.push({ url, options });
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ messages: [{ id: 'wamid.exception-1' }] })
+      };
+    };
+
+    const response = await reportRajException(server, {
+      'rndr-id': 'render-exception-123'
+    });
+
+    assert.equal(response.statusCode, 201);
+    assert.deepEqual(response.body.data.notificationDelivery, {
+      status: 'ACCEPTED_BY_META',
+      attemptedAt: response.body.data.notificationDelivery.attemptedAt,
+      messageId: 'wamid.exception-1'
+    });
+    assert.deepEqual(
+      response.body.data.exception.notificationDelivery,
+      response.body.data.notificationDelivery
+    );
+    assert.equal(calls.length, 1);
+    assert.deepEqual(JSON.parse(calls[0].options.body), {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: '919511758488',
+      type: 'template',
+      template: {
+        name: 'shipment_exception_alert_v1',
+        language: { code: 'en_US' },
+        components: [
+          {
+            type: 'header',
+            parameters: [
+              {
+                type: 'image',
+                image: {
+                  link:
+                    'https://logistics.example/images/' +
+                    'breakdown-image.png'
+                }
+              }
+            ]
+          },
+          {
+            type: 'body',
+            parameters: [
+              { type: 'text', text: 'SHP-1024' },
+              { type: 'text', text: 'DRV-101' },
+              { type: 'text', text: 'Vehicle breakdown' },
+              { type: 'text', text: 'Near Pune' },
+              { type: 'text', text: '90 minutes' }
+            ]
+          }
+        ]
+      }
+    });
+    assert.equal(logs.length, 1);
+    const log = JSON.parse(logs[0]);
+    assert.equal(log.event, 'whatsapp.exception.accepted');
+    assert.equal(log.exceptionId, 'EX-002');
+    assert.equal(log.shipmentId, 'SHP-1024');
+    assert.equal(log.driverId, 'DRV-101');
+    assert.equal(log.dispatcherId, 'DSP-001');
+  });
+
+  await t.test('keeps the exception when Meta rejects the alert', async (t) => {
+    const originalFetch = globalThis.fetch;
+    const originalConsoleError = console.error;
+    const originalEnvironment = {
+      enabled: process.env.WHATSAPP_NOTIFICATIONS_ENABLED,
+      token: process.env.WHATSAPP_ACCESS_TOKEN,
+      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
+      graphApiVersion: process.env.WHATSAPP_GRAPH_API_VERSION
+    };
+    const logs = [];
+
+    t.after(() => {
+      globalThis.fetch = originalFetch;
+      console.error = originalConsoleError;
+
+      for (const [name, value] of [
+        ['WHATSAPP_NOTIFICATIONS_ENABLED', originalEnvironment.enabled],
+        ['WHATSAPP_ACCESS_TOKEN', originalEnvironment.token],
+        ['WHATSAPP_PHONE_NUMBER_ID', originalEnvironment.phoneNumberId],
+        ['WHATSAPP_GRAPH_API_VERSION', originalEnvironment.graphApiVersion]
+      ]) {
+        if (value === undefined) {
+          delete process.env[name];
+        } else {
+          process.env[name] = value;
+        }
+      }
+    });
+
+    process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'false';
+    await resetDemo(server);
+    await assignShipmentToRaj(server);
+
+    process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'true';
+    process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-number-id';
+    process.env.WHATSAPP_GRAPH_API_VERSION = 'v25.0';
+    console.error = (message) => logs.push(message);
+    globalThis.fetch = async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: {
+          code: 132001,
+          type: 'OAuthException',
+          message: 'Template does not exist in the specified language',
+          error_data: { details: 'template name or language mismatch' }
+        }
+      })
+    });
+
+    const response = await reportRajException(server);
+    const exceptions = await request(server, {
+      path: '/api/shipments/SHP-1024/exceptions'
+    });
+
+    assert.equal(response.statusCode, 201);
+    assert.equal(response.body.data.notificationDelivery.status, 'FAILED');
+    assert.equal(
+      response.body.data.notificationDelivery.error.code,
+      '132001'
+    );
+    assert.deepEqual(
+      response.body.data.exception.notificationDelivery,
+      response.body.data.notificationDelivery
+    );
+    assert.equal(exceptions.body.count, 1);
+    assert.equal(exceptions.body.data[0].exceptionId, 'EX-002');
+    assert.equal(logs.length, 1);
+    const log = JSON.parse(logs[0]);
+    assert.equal(log.event, 'whatsapp.exception.failed');
+    assert.equal(log.exceptionId, 'EX-002');
+    assert.equal(log.code, '132001');
   });
 
   await t.test('resolves the Dispatcher and permits fleet-wide reads', async () => {
@@ -221,7 +441,7 @@ test('persona-aware MBA APIs', async (t) => {
 
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.data.driverId, 'DRV-203');
-    assert.equal(response.body.data.previousDriverId, 'DRV-101');
+    assert.equal(response.body.data.previousDriverId, null);
   });
 
   await t.test('rejects cross-role access', async () => {

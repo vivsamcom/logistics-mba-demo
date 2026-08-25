@@ -1,4 +1,7 @@
 const repository = require('../repositories/mock-logistics.repository');
+const {
+  getWhatsAppExceptionHeaderImageUrl
+} = require('../config/env');
 const AppError = require('../utils/app-error');
 const { requireShipment } = require('./shipment.service');
 const { requireDriver } = require('./driver.service');
@@ -43,7 +46,78 @@ function getExceptions(status = 'ACTIVE') {
     .filter((exception) => exception.status === normalizedStatus);
 }
 
-function reportException(shipmentId, input) {
+function formatExceptionType(value) {
+  const words = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ');
+
+  return words ? `${words[0].toUpperCase()}${words.slice(1)}` : 'Exception';
+}
+
+function buildExceptionNotification(exception) {
+  const dispatcher = repository
+    .getUsers()
+    .find((user) => user.role === 'DISPATCHER');
+
+  if (!dispatcher || !dispatcher.entityId || !dispatcher.whatsappPhone) {
+    throw new AppError(
+      422,
+      'EXCEPTION_NOTIFICATION_DATA_INCOMPLETE',
+      'A Dispatcher WhatsApp persona is required to send exception alerts'
+    );
+  }
+
+  const delayMinutes = Number(exception.delayMinutes);
+
+  return {
+    channel: 'WHATSAPP',
+    recipient: {
+      dispatcherId: dispatcher.entityId,
+      phone: dispatcher.whatsappPhone
+    },
+    template: {
+      name: 'shipment_exception_alert_v1',
+      category: 'UTILITY',
+      language: 'en_US',
+      header: {
+        format: 'IMAGE',
+        image: {
+          link: getWhatsAppExceptionHeaderImageUrl()
+        }
+      },
+      bodyParameters: [
+        {
+          position: 1,
+          name: 'shipment',
+          value: exception.shipmentId
+        },
+        {
+          position: 2,
+          name: 'driver',
+          value: exception.driverId
+        },
+        {
+          position: 3,
+          name: 'exceptionType',
+          value: formatExceptionType(exception.type)
+        },
+        {
+          position: 4,
+          name: 'location',
+          value: exception.location || 'Not provided'
+        },
+        {
+          position: 5,
+          name: 'delay',
+          value: `${delayMinutes} ${delayMinutes === 1 ? 'minute' : 'minutes'}`
+        }
+      ]
+    }
+  };
+}
+
+function reportException(shipmentId, input, options = {}) {
   const shipment = requireShipment(shipmentId);
   const driverId = input && input.driverId;
   const type = input && input.type;
@@ -79,7 +153,7 @@ function reportException(shipmentId, input) {
     );
   }
 
-  const exception = repository.createException({
+  const exceptionData = {
     shipmentId,
     driverId,
     type: type.trim().toUpperCase(),
@@ -93,7 +167,11 @@ function reportException(shipmentId, input) {
         : null,
     delayMinutes,
     status: 'ACTIVE'
-  });
+  };
+  const notification = options.includeNotification
+    ? buildExceptionNotification(exceptionData)
+    : null;
+  const exception = repository.createException(exceptionData);
 
   if (delayMinutes > 0) {
     const totalActiveDelay = repository
@@ -112,7 +190,7 @@ function reportException(shipmentId, input) {
     );
   }
 
-  return {
+  const result = {
     exception,
     shipment: {
       shipmentId: shipment.shipmentId,
@@ -121,9 +199,16 @@ function reportException(shipmentId, input) {
       delayMinutes: shipment.delayMinutes
     }
   };
+
+  if (notification) {
+    result.notification = notification;
+  }
+
+  return result;
 }
 
 module.exports = {
+  buildExceptionNotification,
   getExceptions,
   reportException
 };

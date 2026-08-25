@@ -19,7 +19,8 @@ system. It does not reproduce or claim to expose any vendor's product APIs.
 - Mock drivers, shipments, assignment events, and exceptions
   held in memory
 - Idempotent load-assignment creation
-- Optional outbound `new_load_assignment_v1` WhatsApp utility notifications
+- Optional outbound load-assignment and dispatcher exception-alert WhatsApp
+  utility notifications
 - Driver current-trip and assignment APIs
 - Shipment summary, delayed-shipment, exception, impact, and available-driver
   APIs
@@ -117,13 +118,15 @@ WHATSAPP_PHONE_NUMBER_ID=
 WHATSAPP_BUSINESS_ACCOUNT_ID=
 WHATSAPP_GRAPH_API_VERSION=
 WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL=https://logistics-mba-demo.onrender.com/images/load-assignment-header.png
+WHATSAPP_EXCEPTION_HEADER_IMAGE_URL=https://logistics-mba-demo.onrender.com/images/breakdown-image.png
 WHATSAPP_NOTIFICATIONS_ENABLED=false
 ```
 
 Never commit `.env`. Set `WHATSAPP_NOTIFICATIONS_ENABLED=true` only after the
 access token, sender phone-number ID, and a currently supported Graph API
 version are configured. `WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL` can override the
-default public image URL used by the load-assignment template.
+default public image URL used by the load-assignment template, and
+`WHATSAPP_EXCEPTION_HEADER_IMAGE_URL` can override the exception-alert image.
 `WHATSAPP_BUSINESS_ACCOUNT_ID` is not used by the send call, but remains
 available for template-management operations.
 
@@ -206,11 +209,13 @@ curl -X POST \
   -H "X-WhatsApp-Phone: 919823784110" \
   -H "Content-Type: application/json" \
   -d '{"response":"ACCEPT"}' \
-  http://localhost:3000/api/me/assignments/SHP-1088/respond
+  http://localhost:3000/api/me/assignments/SHP-1024/respond
 ```
 
 Driver exception reporting derives `DRV-101` from the header and does not
-accept a caller-selected `driverId`:
+accept a caller-selected `driverId`. A successful report also sends the
+approved `shipment_exception_alert_v1` utility template to the configured
+Dispatcher persona:
 
 ```bash
 curl -X POST \
@@ -463,24 +468,34 @@ Start the app, then run the following commands in order.
 curl -X POST http://localhost:3000/api/demo/reset
 ```
 
-2. Query Raj's current trip:
+2. Assign `SHP-1024` to Raj. This sends the load-assignment utility template
+when WhatsApp notifications are enabled:
 
 ```bash
-curl http://localhost:3000/api/drivers/DRV-101/current-trip
-```
-
-3. Query `SHP-1024`:
-
-```bash
-curl http://localhost:3000/api/shipments/SHP-1024
-```
-
-4. Report the vehicle breakdown near Pune with a 90-minute delay:
-
-```bash
-curl -X POST http://localhost:3000/api/shipments/SHP-1024/exceptions \
+curl -X POST http://localhost:3000/api/assignments \
   -H "Content-Type: application/json" \
-  -d '{"driverId":"DRV-101","type":"VEHICLE_BREAKDOWN","reason":"Truck breakdown","location":"Near Pune","delayMinutes":90}'
+  -d '{"eventId":"ASSIGN-DEMO-1024","shipmentId":"SHP-1024","driverId":"DRV-101"}'
+```
+
+3. Accept the assignment as Raj:
+
+```bash
+curl -X POST \
+  -H "X-WhatsApp-Phone: 919823784110" \
+  -H "Content-Type: application/json" \
+  -d '{"response":"ACCEPT"}' \
+  http://localhost:3000/api/me/assignments/SHP-1024/respond
+```
+
+4. Report the vehicle breakdown as Raj. This sends the dispatcher exception
+alert when WhatsApp notifications are enabled:
+
+```bash
+curl -X POST \
+  -H "X-WhatsApp-Phone: 919823784110" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"VEHICLE_BREAKDOWN","reason":"Truck breakdown","location":"Near Pune","delayMinutes":90}' \
+  http://localhost:3000/api/me/shipments/SHP-1024/exceptions
 ```
 
 5. Verify `SHP-1024` is now delayed with ETA `18:30`:
@@ -497,54 +512,31 @@ curl http://localhost:3000/api/exceptions
 
 The response contains the initial seed exception plus the new `EX-002`.
 
-7. Query Raj's current and next assignments:
+7. Find available replacement drivers for `SHP-1024`:
 
 ```bash
-curl http://localhost:3000/api/drivers/DRV-101/assignments
+curl http://localhost:3000/api/shipments/SHP-1024/available-drivers
 ```
 
-8. Ask whether the delay impacts next shipment `SHP-1088`:
+8. Reassign `SHP-1024` to Amit (`DRV-203`):
 
 ```bash
-curl http://localhost:3000/api/shipments/SHP-1088/impact
-```
-
-The backend returns `impacted: true`, `risk: HIGH`, and identifies `SHP-1024`
-as the source.
-
-9. Find available drivers for `SHP-1088`:
-
-```bash
-curl http://localhost:3000/api/shipments/SHP-1088/available-drivers
-```
-
-10. Reassign `SHP-1088` to Amit (`DRV-203`):
-
-```bash
-curl -X POST http://localhost:3000/api/shipments/SHP-1088/reassign \
+curl -X POST http://localhost:3000/api/shipments/SHP-1024/reassign \
   -H "Content-Type: application/json" \
   -d '{"newDriverId":"DRV-203"}'
 ```
 
-11. Verify the shipment and Amit's assignment:
+9. Verify the shipment and Amit's assignment:
 
 ```bash
-curl http://localhost:3000/api/shipments/SHP-1088
+curl http://localhost:3000/api/shipments/SHP-1024
 curl http://localhost:3000/api/drivers/DRV-203/assignments
 ```
 
-12. Reset again for the next rehearsal:
+10. Reset again for the next rehearsal:
 
 ```bash
 curl -X POST http://localhost:3000/api/demo/reset
-```
-
-Optional pending-assignment response example after a reset:
-
-```bash
-curl -X POST http://localhost:3000/api/assignments/SHP-1088/respond \
-  -H "Content-Type: application/json" \
-  -d '{"driverId":"DRV-101","response":"ACCEPT"}'
 ```
 
 ## WhatsApp webhook
@@ -588,13 +580,14 @@ WHATSAPP_ACCESS_TOKEN=<system-user-token-with-whatsapp_business_messaging>
 WHATSAPP_PHONE_NUMBER_ID=<meta-sender-phone-number-id>
 WHATSAPP_GRAPH_API_VERSION=<supported-version-shown-by-meta>
 WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL=https://logistics-mba-demo.onrender.com/images/load-assignment-header.png
+WHATSAPP_EXCEPTION_HEADER_IMAGE_URL=https://logistics-mba-demo.onrender.com/images/breakdown-image.png
 WHATSAPP_NOTIFICATIONS_ENABLED=true
 ```
 
-The recipient comes from the assigned driver's existing `phone` field. Seed
-phone numbers are intentionally unchanged; fictional numbers will be rejected
-by Meta, and a Meta test sender can send only to recipients allowed in the app
-dashboard. The Cloud API request is:
+Load assignments use the assigned driver's existing `phone` field. Driver
+exception alerts use the first `DISPATCHER` persona in `seed/users.json`.
+Fictional phone numbers will be rejected by Meta, and a Meta test sender can
+send only to recipients allowed in the app dashboard. The Cloud API request is:
 
 ```text
 POST https://graph.facebook.com/{version}/{phone-number-id}/messages
@@ -602,21 +595,15 @@ POST https://graph.facebook.com/{version}/{phone-number-id}/messages
 
 ### End-to-end assignment notification check
 
-In the seed data, the real demo WhatsApp number belongs to `DRV-101`, which
-already has `SHP-1088` in its next-assignment slot. Reset the demo, move that
-shipment to an available driver, and then assign `SHP-1092` to `DRV-101`:
+In the seed data, the real demo WhatsApp number belongs to `DRV-101`. Reset the
+demo and assign `SHP-1024` directly to that driver:
 
 ```bash
 curl -X POST https://logistics-mba-demo.onrender.com/api/demo/reset
 
 curl -X POST \
   -H "Content-Type: application/json" \
-  -d '{"newDriverId":"DRV-203"}' \
-  https://logistics-mba-demo.onrender.com/api/shipments/SHP-1088/reassign
-
-curl -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"eventId":"ASSIGN-LIVE-0001","shipmentId":"SHP-1092","driverId":"DRV-101"}' \
+  -d '{"eventId":"ASSIGN-LIVE-0001","shipmentId":"SHP-1024","driverId":"DRV-101"}' \
   https://logistics-mba-demo.onrender.com/api/assignments
 ```
 
@@ -625,17 +612,36 @@ The last response should contain
 `data.notification.recipient.phone: "+919823784110"`. A later webhook status
 of `delivered` confirms delivery to WhatsApp.
 
+### End-to-end exception alert check
+
+After assigning `SHP-1024` to Raj, report the exception through the Driver
+persona endpoint:
+
+```bash
+curl -X POST \
+  -H "X-WhatsApp-Phone: 919823784110" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"VEHICLE_BREAKDOWN","location":"Near Pune","delayMinutes":90}' \
+  https://logistics-mba-demo.onrender.com/api/me/shipments/SHP-1024/exceptions
+```
+
+The response includes the generated `shipment_exception_alert_v1` payload and
+`data.notificationDelivery`. `ACCEPTED_BY_META` contains the `wamid`; a later
+`delivered` webhook status confirms arrival at the Dispatcher number.
+
 ### Render diagnostics
 
 Outbound results are written as single-line structured JSON to stdout/stderr,
-so they appear in the Render service's **Logs** page. Search for either event:
+so they appear in the Render service's **Logs** page. Search for these events:
 
 - `whatsapp.assignment.accepted`
 - `whatsapp.assignment.failed`
+- `whatsapp.exception.accepted`
+- `whatsapp.exception.failed`
 
-A failure log contains the assignment event, shipment, driver, masked recipient,
-template name/language, HTTP status, Meta error code/subcode/details, Meta trace
-and request IDs, and Render's `Rndr-Id` request correlation value. Access tokens
+A failure log contains the assignment event or exception, shipment, driver,
+masked recipient, template name/language, HTTP status, Meta error details,
+trace and request IDs, and Render's `Rndr-Id` correlation value. Access tokens
 and complete recipient phone numbers are never logged. Example:
 
 ```json
@@ -672,7 +678,7 @@ The service remains suitable for one future Render Web Service: it uses
 `process.env.PORT`, exposes `/health`, stores secrets in environment variables,
 does not hardcode its callback host, and does not write runtime state to disk.
 
-A future phase can add outbound notifications for exception events and process
-assignment confirmation replies. MBA connector schemas/configuration can map
-to the generic REST APIs while transportation decisions remain in the backend
-or its future platform adapter.
+A future phase can process assignment confirmation replies directly from
+WhatsApp. MBA connector schemas/configuration can map to the generic REST APIs
+while transportation decisions remain in the backend or its future platform
+adapter.

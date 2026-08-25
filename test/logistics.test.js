@@ -139,6 +139,14 @@ function createLoadAssignment(server, overrides = {}, headers = {}) {
   });
 }
 
+function assignShipmentToRaj(server) {
+  return createLoadAssignment(server, {
+    eventId: 'ASSIGN-RAJ-1024',
+    shipmentId: 'SHP-1024',
+    driverId: 'DRV-101'
+  });
+}
+
 test('mock logistics demo APIs', async (t) => {
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -154,8 +162,8 @@ test('mock logistics demo APIs', async (t) => {
     assert.deepEqual(response.body.data, {
       operatingDate: getSystemDate(),
       total: 5,
-      scheduled: 2,
-      inTransit: 2,
+      scheduled: 3,
+      inTransit: 1,
       delayed: 1,
       activeExceptions: 1
     });
@@ -178,8 +186,8 @@ test('mock logistics demo APIs', async (t) => {
       response.body.data.deliveryLocation,
       'Bengaluru Warehouse'
     );
-    assert.equal(response.body.data.driver.driverId, 'DRV-101');
-    assert.equal(response.body.data.assignment.status, 'ACCEPTED');
+    assert.equal(response.body.data.driver, null);
+    assert.equal(response.body.data.assignment, null);
   });
 
   await t.test('returns a structured 404 for an unknown shipment', async () => {
@@ -217,23 +225,22 @@ test('mock logistics demo APIs', async (t) => {
     });
 
     assert.equal(currentTrip.statusCode, 200);
-    assert.equal(currentTrip.body.data.shipment.shipmentId, 'SHP-1024');
-    assert.deepEqual(
-      assignments.body.data.map((item) => item.shipmentId),
-      ['SHP-1024', 'SHP-1088']
-    );
+    assert.equal(currentTrip.body.data.shipment, null);
+    assert.equal(currentTrip.body.data.assignment, null);
+    assert.deepEqual(assignments.body.data, []);
   });
 
   await t.test('accepts a pending assignment and validates repeat responses', async () => {
     await resetDemo(server);
+    await assignShipmentToRaj(server);
     const accepted = await request(server, {
       method: 'POST',
-      path: '/api/assignments/SHP-1088/respond',
+      path: '/api/assignments/SHP-1024/respond',
       body: { driverId: 'DRV-101', response: 'ACCEPT' }
     });
     const repeated = await request(server, {
       method: 'POST',
-      path: '/api/assignments/SHP-1088/respond',
+      path: '/api/assignments/SHP-1024/respond',
       body: { driverId: 'DRV-101', response: 'REJECT' }
     });
 
@@ -406,7 +413,6 @@ test('mock logistics demo APIs', async (t) => {
     };
 
     await resetDemo(server);
-    const reassigned = await reassignToAmit(server);
     const created = await createLoadAssignment(server, {
       driverId: 'DRV-101'
     });
@@ -414,7 +420,6 @@ test('mock logistics demo APIs', async (t) => {
       driverId: 'DRV-101'
     });
 
-    assert.equal(reassigned.statusCode, 200);
     assert.equal(created.statusCode, 201);
     assert.deepEqual(created.body.data.notificationDelivery, {
       status: 'ACCEPTED_BY_META',
@@ -597,7 +602,7 @@ test('mock logistics demo APIs', async (t) => {
     });
     const existingAssignment = await createLoadAssignment(server, {
       eventId: 'ASSIGN-0002',
-      shipmentId: 'SHP-1024',
+      shipmentId: 'SHP-1050',
       driverId: 'DRV-101'
     });
 
@@ -656,6 +661,7 @@ test('mock logistics demo APIs', async (t) => {
 
   await t.test('records a breakdown and updates shipment and exception views', async () => {
     await resetDemo(server);
+    await assignShipmentToRaj(server);
     const created = await reportBreakdown(server);
     const shipment = await request(server, {
       path: '/api/shipments/SHP-1024'
@@ -680,6 +686,7 @@ test('mock logistics demo APIs', async (t) => {
 
   await t.test('supplies backend-owned downstream impact', async () => {
     await resetDemo(server);
+    await assignShipmentToRaj(server);
     await reportBreakdown(server);
     const response = await request(server, {
       path: '/api/shipments/SHP-1088/impact'
@@ -688,11 +695,10 @@ test('mock logistics demo APIs', async (t) => {
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.body.data, {
       shipmentId: 'SHP-1088',
-      impacted: true,
-      risk: 'HIGH',
-      sourceShipmentId: 'SHP-1024',
-      delayMinutes: 90,
-      reason: "The driver's earlier assignment has an active 90-minute delay"
+      impacted: false,
+      risk: 'NONE',
+      sourceShipmentId: null,
+      reason: 'No driver is currently assigned to this shipment'
     });
   });
 
@@ -724,21 +730,19 @@ test('mock logistics demo APIs', async (t) => {
 
     assert.equal(reassignment.statusCode, 200);
     assert.equal(reassignment.body.data.driverId, 'DRV-203');
-    assert.equal(reassignment.body.data.previousDriverId, 'DRV-101');
+    assert.equal(reassignment.body.data.previousDriverId, null);
     assert.equal(shipment.body.data.driverId, 'DRV-203');
     assert.equal(shipment.body.data.assignment.driverId, 'DRV-203');
     assert.deepEqual(
       amitAssignments.body.data.map((item) => item.shipmentId),
       ['SHP-1088']
     );
-    assert.deepEqual(
-      rajAssignments.body.data.map((item) => item.shipmentId),
-      ['SHP-1024']
-    );
+    assert.deepEqual(rajAssignments.body.data, []);
   });
 
   await t.test('restores every mutation to the original seed state', async () => {
     await resetDemo(server);
+    await assignShipmentToRaj(server);
     await reportBreakdown(server);
     await reassignToAmit(server);
 
@@ -758,9 +762,10 @@ test('mock logistics demo APIs', async (t) => {
 
     assert.equal(reset.statusCode, 200);
     assert.equal(reset.body.data.status, 'RESET');
-    assert.equal(currentShipment.body.data.status, 'IN_TRANSIT');
+    assert.equal(currentShipment.body.data.status, 'SCHEDULED');
     assert.equal(currentShipment.body.data.eta, '17:00');
-    assert.equal(nextShipment.body.data.driverId, 'DRV-101');
+    assert.equal(currentShipment.body.data.driverId, null);
+    assert.equal(nextShipment.body.data.driverId, null);
     assert.equal(exceptions.body.count, 0);
     assert.equal(
       availableDrivers.body.data.some(

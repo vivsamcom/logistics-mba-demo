@@ -4,6 +4,8 @@ dotenv.config();
 
 const DEFAULT_WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL =
   'https://logistics-mba-demo.onrender.com/images/load-assignment-header.png';
+const DEFAULT_WHATSAPP_EXCEPTION_HEADER_IMAGE_URL =
+  'https://logistics-mba-demo.onrender.com/images/breakdown-image.png';
 
 function isMetaSignatureValidationEnabled() {
   return String(process.env.META_SIGNATURE_VALIDATION_ENABLED)
@@ -25,8 +27,17 @@ function getWhatsAppAssignmentHeaderImageUrl() {
   return configuredUrl || DEFAULT_WHATSAPP_ASSIGNMENT_HEADER_IMAGE_URL;
 }
 
+function getWhatsAppExceptionHeaderImageUrl() {
+  const configuredUrl = String(
+    process.env.WHATSAPP_EXCEPTION_HEADER_IMAGE_URL || ''
+  ).trim();
+
+  return configuredUrl || DEFAULT_WHATSAPP_EXCEPTION_HEADER_IMAGE_URL;
+}
+
 module.exports = {
   getWhatsAppAssignmentHeaderImageUrl,
+  getWhatsAppExceptionHeaderImageUrl,
   isMetaSignatureValidationEnabled,
   isWhatsAppNotificationsEnabled
 };

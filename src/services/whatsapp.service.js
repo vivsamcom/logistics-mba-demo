@@ -53,8 +53,7 @@ function maskRecipientPhone(value) {
 function buildLogContext(notification, context) {
   const recipient = notification && notification.recipient;
   const template = notification && notification.template;
-
-  return {
+  const logContext = {
     requestId: (context && context.requestId) || null,
     eventId: (context && context.eventId) || null,
     shipmentId: (context && context.shipmentId) || null,
@@ -64,6 +63,20 @@ function buildLogContext(notification, context) {
     templateName: (template && template.name) || null,
     templateLanguage: (template && template.language) || null
   };
+
+  if (context && context.exceptionId) {
+    logContext.exceptionId = context.exceptionId;
+  }
+
+  if (
+    (context && context.dispatcherId) ||
+    (recipient && recipient.dispatcherId)
+  ) {
+    logContext.dispatcherId =
+      (context && context.dispatcherId) || recipient.dispatcherId;
+  }
+
+  return logContext;
 }
 
 function writeLog(level, event, details) {
@@ -250,7 +263,12 @@ async function sendTemplateMessage(notification, fetchImplementation) {
   return body || {};
 }
 
-async function sendAssignmentNotification(notification, context = {}) {
+async function sendNotification(
+  notification,
+  context,
+  acceptedEvent,
+  failedEvent
+) {
   const logContext = buildLogContext(notification, context);
 
   if (!isWhatsAppNotificationsEnabled()) {
@@ -269,7 +287,7 @@ async function sendAssignmentNotification(notification, context = {}) {
       : null;
     const messageId = (firstMessage && firstMessage.id) || null;
 
-    writeLog('info', 'whatsapp.assignment.accepted', {
+    writeLog('info', acceptedEvent, {
       ...logContext,
       messageId
     });
@@ -280,7 +298,7 @@ async function sendAssignmentNotification(notification, context = {}) {
       messageId
     };
   } catch (error) {
-    writeLog('error', 'whatsapp.assignment.failed', {
+    writeLog('error', failedEvent, {
       ...logContext,
       code: error.code || 'WHATSAPP_SEND_FAILED',
       message: error.message,
@@ -301,8 +319,27 @@ async function sendAssignmentNotification(notification, context = {}) {
   }
 }
 
+function sendAssignmentNotification(notification, context = {}) {
+  return sendNotification(
+    notification,
+    context,
+    'whatsapp.assignment.accepted',
+    'whatsapp.assignment.failed'
+  );
+}
+
+function sendExceptionNotification(notification, context = {}) {
+  return sendNotification(
+    notification,
+    context,
+    'whatsapp.exception.accepted',
+    'whatsapp.exception.failed'
+  );
+}
+
 module.exports = {
   buildTemplateMessage,
   sendTemplateMessage,
-  sendAssignmentNotification
+  sendAssignmentNotification,
+  sendExceptionNotification
 };

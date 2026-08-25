@@ -1,6 +1,7 @@
 const driverService = require('../services/driver.service');
 const assignmentService = require('../services/assignment.service');
 const exceptionService = require('../services/exception.service');
+const whatsappService = require('../services/whatsapp.service');
 
 function getPersona(req, res) {
   const { role, entityId, name } = req.persona;
@@ -31,17 +32,37 @@ function respondToAssignment(req, res) {
   });
 }
 
-function reportException(req, res) {
+async function reportException(req, res) {
   const input = req.body || {};
-
-  return res.status(201).json({
-    data: exceptionService.reportException(req.params.shipmentId, {
+  const result = exceptionService.reportException(
+    req.params.shipmentId,
+    {
       driverId: req.persona.entityId,
       type: input.type,
       reason: input.reason,
       location: input.location,
       delayMinutes: input.delayMinutes
-    })
+    },
+    { includeNotification: true }
+  );
+  const notificationDelivery =
+    await whatsappService.sendExceptionNotification(result.notification, {
+      requestId: req.get('Rndr-Id') || req.get('X-Request-Id') || null,
+      exceptionId: result.exception.exceptionId,
+      shipmentId: result.exception.shipmentId,
+      driverId: result.exception.driverId,
+      dispatcherId: result.notification.recipient.dispatcherId
+    });
+
+  if (notificationDelivery.status !== 'SKIPPED') {
+    result.exception.notificationDelivery = notificationDelivery;
+  }
+
+  return res.status(201).json({
+    data: {
+      ...result,
+      notificationDelivery
+    }
   });
 }
 
