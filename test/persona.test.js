@@ -324,10 +324,10 @@ test('persona-aware MBA APIs', async (t) => {
             type: 'body',
             parameters: [
               { type: 'text', text: 'SHP-1024' },
-              { type: 'text', text: 'DRV-101' },
+              { type: 'text', text: 'DRV-101 - Raj' },
               { type: 'text', text: 'Vehicle breakdown' },
               { type: 'text', text: 'Near Pune' },
-              { type: 'text', text: '90 minutes' }
+              { type: 'text', text: '1 hour 30 minutes' }
             ]
           }
         ]

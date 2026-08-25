@@ -633,7 +633,11 @@ curl -X POST \
 
 The response includes the generated `shipment_exception_alert_v1` payload and
 `data.notificationDelivery`. `ACCEPTED_BY_META` contains the `wamid`; a later
-`delivered` webhook status confirms arrival at the Dispatcher number.
+`delivered` webhook status confirms arrival at the Dispatcher number. The
+template's Driver value includes both ID and name, such as `DRV-101 - Raj`.
+Delay values retain exact precision using minutes below one hour, hours from
+one hour, and days from 24 hours, such as `45 minutes`, `1 hour 30 minutes`,
+or `1 day 1 hour 30 minutes`.
 
 ### Render diagnostics
 

@@ -55,7 +55,44 @@ function formatExceptionType(value) {
   return words ? `${words[0].toUpperCase()}${words.slice(1)}` : 'Exception';
 }
 
-function buildExceptionNotification(exception) {
+function formatDurationPart(value, unit) {
+  return `${value} ${unit}${value === 1 ? '' : 's'}`;
+}
+
+function formatDelayDuration(value) {
+  const totalMinutes = Number(value);
+
+  if (!Number.isInteger(totalMinutes) || totalMinutes < 0) {
+    throw new AppError(
+      422,
+      'EXCEPTION_NOTIFICATION_DATA_INCOMPLETE',
+      'exception.delayMinutes must be a non-negative integer'
+    );
+  }
+
+  if (totalMinutes < 60) {
+    return formatDurationPart(totalMinutes, 'minute');
+  }
+
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+  const parts = [];
+
+  if (days > 0) {
+    parts.push(formatDurationPart(days, 'day'));
+  }
+  if (hours > 0) {
+    parts.push(formatDurationPart(hours, 'hour'));
+  }
+  if (minutes > 0) {
+    parts.push(formatDurationPart(minutes, 'minute'));
+  }
+
+  return parts.join(' ');
+}
+
+function buildExceptionNotification(exception, assignedDriver) {
   const dispatcher = repository
     .getUsers()
     .find((user) => user.role === 'DISPATCHER');
@@ -68,7 +105,16 @@ function buildExceptionNotification(exception) {
     );
   }
 
-  const delayMinutes = Number(exception.delayMinutes);
+  const driver =
+    assignedDriver || repository.getDriverById(exception.driverId);
+
+  if (!driver || typeof driver.name !== 'string' || !driver.name.trim()) {
+    throw new AppError(
+      422,
+      'EXCEPTION_NOTIFICATION_DATA_INCOMPLETE',
+      'The assigned driver name is required to send exception alerts'
+    );
+  }
 
   return {
     channel: 'WHATSAPP',
@@ -95,7 +141,7 @@ function buildExceptionNotification(exception) {
         {
           position: 2,
           name: 'driver',
-          value: exception.driverId
+          value: `${exception.driverId} - ${driver.name.trim()}`
         },
         {
           position: 3,
@@ -110,7 +156,7 @@ function buildExceptionNotification(exception) {
         {
           position: 5,
           name: 'delay',
-          value: `${delayMinutes} ${delayMinutes === 1 ? 'minute' : 'minutes'}`
+          value: formatDelayDuration(exception.delayMinutes)
         }
       ]
     }
@@ -169,7 +215,7 @@ function reportException(shipmentId, input, options = {}) {
     status: 'ACTIVE'
   };
   const notification = options.includeNotification
-    ? buildExceptionNotification(exceptionData)
+    ? buildExceptionNotification(exceptionData, driver)
     : null;
   const exception = repository.createException(exceptionData);
 
@@ -209,6 +255,7 @@ function reportException(shipmentId, input, options = {}) {
 
 module.exports = {
   buildExceptionNotification,
+  formatDelayDuration,
   getExceptions,
   reportException
 };
