@@ -84,8 +84,35 @@ function getShipmentExceptions(shipmentId) {
     .filter((exception) => exception.shipmentId === shipmentId);
 }
 
+function getActiveDelayMinutes(shipmentId) {
+  return repository
+    .getExceptions()
+    .filter(
+      (exception) =>
+        exception.shipmentId === shipmentId &&
+        exception.status === 'ACTIVE'
+    )
+    .reduce(
+      (total, exception) => total + (exception.delayMinutes || 0),
+      0
+    );
+}
+
 function getShipmentImpact(shipmentId) {
-  const shipment = requireShipment(shipmentId);
+  requireShipment(shipmentId);
+  const directDelayMinutes = getActiveDelayMinutes(shipmentId);
+
+  if (directDelayMinutes > 0) {
+    return {
+      shipmentId,
+      impacted: true,
+      risk: directDelayMinutes >= 60 ? 'HIGH' : 'MEDIUM',
+      sourceShipmentId: shipmentId,
+      delayMinutes: directDelayMinutes,
+      reason: `This shipment has an active ${directDelayMinutes}-minute delay`
+    };
+  }
+
   const assignment = repository.getAssignmentByShipmentId(shipmentId);
 
   if (!assignment || !assignment.driverId) {
@@ -118,17 +145,9 @@ function getShipmentImpact(shipmentId) {
     };
   }
 
-  const delayMinutes = repository
-    .getExceptions()
-    .filter(
-      (exception) =>
-        exception.shipmentId === previousAssignment.shipmentId &&
-        exception.status === 'ACTIVE'
-    )
-    .reduce(
-      (total, exception) => total + (exception.delayMinutes || 0),
-      0
-    );
+  const delayMinutes = getActiveDelayMinutes(
+    previousAssignment.shipmentId
+  );
   const impacted = delayMinutes > 0;
 
   return {

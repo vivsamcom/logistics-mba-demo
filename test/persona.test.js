@@ -183,6 +183,35 @@ test('persona-aware MBA APIs', async (t) => {
     });
   });
 
+  await t.test('returns HIGH direct impact after an accepted assignment reports a long delay', async () => {
+    await resetDemo(server);
+    await assignShipmentToRaj(server);
+    const acceptance = await request(server, {
+      method: 'POST',
+      path: '/api/me/assignments/SHP-1024/respond',
+      headers: personaHeaders(DRIVER_PHONE),
+      body: { response: 'ACCEPT' }
+    });
+    const exception = await reportRajException(server);
+    const impact = await request(server, {
+      path: '/api/dispatcher/shipments/SHP-1024/impact',
+      headers: personaHeaders(DISPATCHER_PHONE)
+    });
+
+    assert.equal(acceptance.statusCode, 200);
+    assert.equal(acceptance.body.data.status, 'ACCEPTED');
+    assert.equal(exception.statusCode, 201);
+    assert.equal(impact.statusCode, 200);
+    assert.deepEqual(impact.body.data, {
+      shipmentId: 'SHP-1024',
+      impacted: true,
+      risk: 'HIGH',
+      sourceShipmentId: 'SHP-1024',
+      delayMinutes: 90,
+      reason: 'This shipment has an active 90-minute delay'
+    });
+  });
+
   await t.test('sends the exception template to the Dispatcher', async (t) => {
     const originalFetch = globalThis.fetch;
     const originalConsoleLog = console.log;

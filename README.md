@@ -181,7 +181,7 @@ mock TMS endpoints:
 | GET | `/api/dispatcher/shipments/delayed` | Dispatcher | Delayed shipments |
 | GET | `/api/dispatcher/exceptions` | Dispatcher | Active or resolved fleet exceptions |
 | GET | `/api/dispatcher/shipments/:shipmentId` | Dispatcher | Shipment details |
-| GET | `/api/dispatcher/shipments/:shipmentId/impact` | Dispatcher | Downstream impact from existing backend rules |
+| GET | `/api/dispatcher/shipments/:shipmentId/impact` | Dispatcher | Direct or downstream impact from backend rules |
 | GET | `/api/dispatcher/shipments/:shipmentId/available-drivers` | Dispatcher | Available drivers from existing backend rules |
 | POST | `/api/dispatcher/shipments/:shipmentId/reassign` | Dispatcher | Confirmed shipment reassignment |
 
@@ -262,7 +262,7 @@ replacement for authenticating the connector in production.
 | GET | `/api/shipments/:shipmentId` | Shipment, driver, assignment, and exceptions |
 | GET | `/api/shipments/:shipmentId/exceptions` | Shipment exception history |
 | POST | `/api/shipments/:shipmentId/exceptions` | Record a driver-reported exception |
-| GET | `/api/shipments/:shipmentId/impact` | Mock downstream risk supplied by the backend |
+| GET | `/api/shipments/:shipmentId/impact` | Mock direct or downstream risk supplied by the backend |
 | GET | `/api/shipments/:shipmentId/available-drivers` | Mock driver availability |
 | POST | `/api/shipments/:shipmentId/reassign` | Perform a confirmed reassignment |
 | GET | `/api/drivers/:driverId/current-trip` | Driver's current shipment context |
@@ -448,9 +448,10 @@ The intentionally simple mock rules are:
 - A positive reported delay changes a shipment to `DELAYED`.
 - Revised ETA is original ETA plus total active delay minutes; this is clock
   arithmetic only, not ETA prediction.
-- A target shipment is impacted when the same driver's preceding assignment
-  has an active delay. Delays of 60 minutes or more are `HIGH`; shorter delays
-  are `MEDIUM`.
+- A shipment with its own active delay is directly impacted. Otherwise, it is
+  impacted when the same driver's preceding assignment has an active delay.
+  In a direct impact, `sourceShipmentId` is the requested shipment itself.
+  Delays of 60 minutes or more are `HIGH`; shorter delays are `MEDIUM`.
 - A driver is available when seed status is `AVAILABLE` and `availableFrom`
   is no later than the shipment pickup time.
 - Reassignment updates the shipment, assignment, old driver, and new driver in
