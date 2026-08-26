@@ -6,7 +6,7 @@
     "destination": "Bengaluru",
     "pickupLocation": "Mumbai Distribution Center",
     "deliveryLocation": "Bengaluru Warehouse",
-    "pickupTime": "10:00",
+    "pickupTime": "20:00",
     "deliveryWindow": "17:00",
     "expectedDeliveryDayOffset": 2,
     "driverId": null,
