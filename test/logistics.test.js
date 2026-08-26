@@ -308,7 +308,10 @@ test('mock logistics demo APIs', async (t) => {
           {
             position: 5,
             name: 'expectedDeliveryDateTime',
-            value: formatTemplateDateTime(getSystemDate(), '23:00')
+            value: formatTemplateDateTime(
+              addDays(getSystemDate(), 3),
+              '23:00'
+            )
           }
         ],
         buttons: [
@@ -483,7 +486,10 @@ test('mock logistics demo APIs', async (t) => {
               },
               {
                 type: 'text',
-                text: formatTemplateDateTime(getSystemDate(), '23:00')
+                text: formatTemplateDateTime(
+                  addDays(getSystemDate(), 3),
+                  '23:00'
+                )
               }
             ]
           }
