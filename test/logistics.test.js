@@ -117,7 +117,7 @@ function reportBreakdown(server) {
   });
 }
 
-function reassignToAmit(server, headers = {}) {
+function reassignToJohn(server, headers = {}) {
   return request(server, {
     method: 'POST',
     path: '/api/shipments/SHP-1088/reassign',
@@ -140,7 +140,7 @@ function createLoadAssignment(server, overrides = {}, headers = {}) {
   });
 }
 
-function assignShipmentToRaj(server) {
+function assignShipmentToRocky(server) {
   return createLoadAssignment(server, {
     eventId: 'ASSIGN-RAJ-1024',
     shipmentId: 'SHP-1024',
@@ -233,7 +233,7 @@ test('mock logistics demo APIs', async (t) => {
 
   await t.test('accepts a pending assignment and validates repeat responses', async () => {
     await resetDemo(server);
-    await assignShipmentToRaj(server);
+    await assignShipmentToRocky(server);
     const accepted = await request(server, {
       method: 'POST',
       path: '/api/assignments/SHP-1024/respond',
@@ -668,7 +668,7 @@ test('mock logistics demo APIs', async (t) => {
 
   await t.test('records a breakdown and updates shipment and exception views', async () => {
     await resetDemo(server);
-    await assignShipmentToRaj(server);
+    await assignShipmentToRocky(server);
     const created = await reportBreakdown(server);
     const shipment = await request(server, {
       path: '/api/shipments/SHP-1024'
@@ -693,7 +693,7 @@ test('mock logistics demo APIs', async (t) => {
 
   await t.test('supplies backend-owned downstream impact', async () => {
     await resetDemo(server);
-    await assignShipmentToRaj(server);
+    await assignShipmentToRocky(server);
     await reportBreakdown(server);
     const response = await request(server, {
       path: '/api/shipments/SHP-1088/impact'
@@ -724,14 +724,14 @@ test('mock logistics demo APIs', async (t) => {
 
   await t.test('reassigns the shipment and keeps assignment data consistent', async () => {
     await resetDemo(server);
-    const reassignment = await reassignToAmit(server);
+    const reassignment = await reassignToJohn(server);
     const shipment = await request(server, {
       path: '/api/shipments/SHP-1088'
     });
-    const amitAssignments = await request(server, {
+    const johnAssignments = await request(server, {
       path: '/api/drivers/DRV-203/assignments'
     });
-    const rajAssignments = await request(server, {
+    const rockyAssignments = await request(server, {
       path: '/api/drivers/DRV-101/assignments'
     });
 
@@ -753,15 +753,15 @@ test('mock logistics demo APIs', async (t) => {
     assert.equal(shipment.body.data.driverId, 'DRV-203');
     assert.equal(shipment.body.data.assignment.driverId, 'DRV-203');
     assert.deepEqual(
-      amitAssignments.body.data.map((item) => item.shipmentId),
+      johnAssignments.body.data.map((item) => item.shipmentId),
       ['SHP-1088']
     );
-    assert.deepEqual(rajAssignments.body.data, []);
+    assert.deepEqual(rockyAssignments.body.data, []);
   });
 
   await t.test('resolves old-driver exceptions when reassigning', async () => {
     await resetDemo(server);
-    await assignShipmentToRaj(server);
+    await assignShipmentToRocky(server);
     await reportBreakdown(server);
 
     const reassignment = await request(server, {
@@ -899,7 +899,7 @@ test('mock logistics demo APIs', async (t) => {
     };
 
     await resetDemo(server);
-    const reassignment = await reassignToAmit(server, {
+    const reassignment = await reassignToJohn(server, {
       'x-request-id': 'reassign-request-123'
     });
 
@@ -939,7 +939,7 @@ test('mock logistics demo APIs', async (t) => {
     await resetDemo(server);
     repository.getDriverById('DRV-203').phone = null;
 
-    const reassignment = await reassignToAmit(server);
+    const reassignment = await reassignToJohn(server);
     const shipment = await request(server, {
       path: '/api/shipments/SHP-1088'
     });
@@ -955,9 +955,9 @@ test('mock logistics demo APIs', async (t) => {
 
   await t.test('restores every mutation to the original seed state', async () => {
     await resetDemo(server);
-    await assignShipmentToRaj(server);
+    await assignShipmentToRocky(server);
     await reportBreakdown(server);
-    await reassignToAmit(server);
+    await reassignToJohn(server);
 
     const reset = await resetDemo(server);
     const currentShipment = await request(server, {

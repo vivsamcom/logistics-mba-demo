@@ -159,8 +159,8 @@ number against the fictional mappings in `src/data/seed/users.json`:
 
 | Demo phone | Role | Entity | Name |
 |---|---|---|---|
-| `919823784110` | `DRIVER` | `DRV-101` | Raj |
-| `918329216051` | `DRIVER` | `DRV-203` | Amit |
+| `919823784110` | `DRIVER` | `DRV-101` | Rocky |
+| `918329216051` | `DRIVER` | `DRV-203` | John |
 | `919511758488` | `DISPATCHER` | `DSP-001` | Anita |
 
 These formatted Driver values all resolve to the same persona:
@@ -437,8 +437,8 @@ business/operating date.
 The seed contains five fictional shipments and five fictional drivers using
 dummy phone numbers. It includes:
 
-- Raj (`DRV-101`) on current shipment `SHP-1024`, with `SHP-1088` next
-- Amit (`DRV-203`) and Sunil (`DRV-218`) available for `SHP-1088`
+- Rocky (`DRV-101`) on current shipment `SHP-1024`, with `SHP-1088` next
+- John (`DRV-203`) and Samson (`DRV-218`) available for `SHP-1088`
 - Two scheduled, two in-transit, and one delayed shipment
 - One initial active exception on `SHP-1099`
 
@@ -477,7 +477,7 @@ Start the app, then run the following commands in order.
 curl -X POST http://localhost:3000/api/demo/reset
 ```
 
-2. Assign `SHP-1024` to Raj. This sends the load-assignment utility template
+2. Assign `SHP-1024` to Rocky. This sends the load-assignment utility template
 when WhatsApp notifications are enabled:
 
 ```bash
@@ -486,7 +486,7 @@ curl -X POST http://localhost:3000/api/assignments \
   -d '{"eventId":"ASSIGN-DEMO-1024","shipmentId":"SHP-1024","driverId":"DRV-101"}'
 ```
 
-3. Accept the assignment as Raj:
+3. Accept the assignment as Rocky:
 
 ```bash
 curl -X POST \
@@ -496,7 +496,7 @@ curl -X POST \
   http://localhost:3000/api/me/assignments/SHP-1024/respond
 ```
 
-4. Report the vehicle breakdown as Raj. This sends the dispatcher exception
+4. Report the vehicle breakdown as Rocky. This sends the dispatcher exception
 alert when WhatsApp notifications are enabled:
 
 ```bash
@@ -527,7 +527,7 @@ The response contains the initial seed exception plus the new `EX-002`.
 curl http://localhost:3000/api/shipments/SHP-1024/available-drivers
 ```
 
-8. Reassign `SHP-1024` to Amit (`DRV-203`):
+8. Reassign `SHP-1024` to John (`DRV-203`):
 
 ```bash
 curl -X POST http://localhost:3000/api/shipments/SHP-1024/reassign \
@@ -541,7 +541,7 @@ assignment. It also returns `data.resolvedExceptionIds`. Resolved exceptions
 are removed from the shipment's active `exceptions` list but remain available
 as `RESOLVED` history from `/api/shipments/:shipmentId/exceptions`.
 
-9. Verify the shipment and Amit's assignment:
+9. Verify the shipment and John's assignment:
 
 ```bash
 curl http://localhost:3000/api/shipments/SHP-1024
@@ -630,7 +630,7 @@ of `delivered` confirms delivery to WhatsApp.
 
 ### End-to-end exception alert check
 
-After assigning `SHP-1024` to Raj, report the exception through the Driver
+After assigning `SHP-1024` to Rocky, report the exception through the Driver
 persona endpoint:
 
 ```bash
@@ -644,7 +644,7 @@ curl -X POST \
 The response includes the generated `shipment_exception_alert_v1` payload and
 `data.notificationDelivery`. `ACCEPTED_BY_META` contains the `wamid`; a later
 `delivered` webhook status confirms arrival at the Dispatcher number. The
-template's Driver value includes both ID and name, such as `DRV-101 - Raj`.
+template's Driver value includes both ID and name, such as `DRV-101 - Rocky`.
 Delay values retain exact precision using minutes below one hour, hours from
 one hour, and days from 24 hours, such as `45 minutes`, `1 hour 30 minutes`,
 or `1 day 1 hour 30 minutes`.

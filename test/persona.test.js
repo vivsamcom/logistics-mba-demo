@@ -74,7 +74,7 @@ function resetDemo(server) {
   });
 }
 
-function assignShipmentToRaj(server) {
+function assignShipmentToRocky(server) {
   return request(server, {
     method: 'POST',
     path: '/api/assignments',
@@ -86,7 +86,7 @@ function assignShipmentToRaj(server) {
   });
 }
 
-function reportRajException(server, headers = {}) {
+function reportRockyException(server, headers = {}) {
   return request(server, {
     method: 'POST',
     path: '/api/me/shipments/SHP-1024/exceptions',
@@ -124,12 +124,12 @@ test('persona-aware MBA APIs', async (t) => {
     assert.deepEqual(response.body.data, {
       role: 'DRIVER',
       entityId: 'DRV-101',
-      name: 'Raj'
+      name: 'Rocky'
     });
     assert.equal(response.body.data.whatsappPhone, undefined);
   });
 
-  await t.test('resolves DRV-203 from Amit\'s WhatsApp number', async () => {
+  await t.test('resolves DRV-203 from John\'s WhatsApp number', async () => {
     const response = await request(server, {
       path: '/api/me/persona',
       headers: personaHeaders(AMIT_PHONE)
@@ -139,7 +139,7 @@ test('persona-aware MBA APIs', async (t) => {
     assert.deepEqual(response.body.data, {
       role: 'DRIVER',
       entityId: 'DRV-203',
-      name: 'Amit'
+      name: 'John'
     });
   });
 
@@ -164,7 +164,7 @@ test('persona-aware MBA APIs', async (t) => {
 
   await t.test('derives the Driver for assignment responses', async () => {
     await resetDemo(server);
-    await assignShipmentToRaj(server);
+    await assignShipmentToRocky(server);
     const response = await request(server, {
       method: 'POST',
       path: '/api/me/assignments/SHP-1024/respond',
@@ -182,8 +182,8 @@ test('persona-aware MBA APIs', async (t) => {
 
   await t.test('derives the Driver when reporting an exception', async () => {
     await resetDemo(server);
-    await assignShipmentToRaj(server);
-    const response = await reportRajException(server);
+    await assignShipmentToRocky(server);
+    const response = await reportRockyException(server);
 
     assert.equal(response.statusCode, 201);
     assert.equal(response.body.data.exception.driverId, 'DRV-101');
@@ -200,14 +200,14 @@ test('persona-aware MBA APIs', async (t) => {
 
   await t.test('returns HIGH direct impact after an accepted assignment reports a long delay', async () => {
     await resetDemo(server);
-    await assignShipmentToRaj(server);
+    await assignShipmentToRocky(server);
     const acceptance = await request(server, {
       method: 'POST',
       path: '/api/me/assignments/SHP-1024/respond',
       headers: personaHeaders(DRIVER_PHONE),
       body: { response: 'ACCEPT' }
     });
-    const exception = await reportRajException(server);
+    const exception = await reportRockyException(server);
     const impact = await request(server, {
       path: '/api/dispatcher/shipments/SHP-1024/impact',
       headers: personaHeaders(DISPATCHER_PHONE)
@@ -264,7 +264,7 @@ test('persona-aware MBA APIs', async (t) => {
 
     process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'false';
     await resetDemo(server);
-    await assignShipmentToRaj(server);
+    await assignShipmentToRocky(server);
 
     process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'true';
     process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
@@ -283,7 +283,7 @@ test('persona-aware MBA APIs', async (t) => {
       };
     };
 
-    const response = await reportRajException(server, {
+    const response = await reportRockyException(server, {
       'rndr-id': 'render-exception-123'
     });
 
@@ -324,7 +324,7 @@ test('persona-aware MBA APIs', async (t) => {
             type: 'body',
             parameters: [
               { type: 'text', text: 'SHP-1024' },
-              { type: 'text', text: 'DRV-101 - Raj' },
+              { type: 'text', text: 'DRV-101 - Rocky' },
               { type: 'text', text: 'Vehicle breakdown' },
               { type: 'text', text: 'Near Pune' },
               { type: 'text', text: '1 hour 30 minutes' }
@@ -373,7 +373,7 @@ test('persona-aware MBA APIs', async (t) => {
 
     process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'false';
     await resetDemo(server);
-    await assignShipmentToRaj(server);
+    await assignShipmentToRocky(server);
 
     process.env.WHATSAPP_NOTIFICATIONS_ENABLED = 'true';
     process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
@@ -393,7 +393,7 @@ test('persona-aware MBA APIs', async (t) => {
       })
     });
 
-    const response = await reportRajException(server);
+    const response = await reportRockyException(server);
     const exceptions = await request(server, {
       path: '/api/shipments/SHP-1024/exceptions'
     });

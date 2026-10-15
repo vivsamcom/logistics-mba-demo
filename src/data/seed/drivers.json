@@ -1,7 +1,7 @@
 [
   {
     "driverId": "DRV-101",
-    "name": "Raj",
+    "name": "Rocky",
     "phone": "+919823784110",
     "status": "AVAILABLE",
     "currentShipmentId": null,
@@ -9,7 +9,7 @@
   },
   {
     "driverId": "DRV-203",
-    "name": "Amit",
+    "name": "John",
     "phone": "+918329216051",
     "status": "AVAILABLE",
     "availableFrom": "08:00",
@@ -18,7 +18,7 @@
   },
   {
     "driverId": "DRV-218",
-    "name": "Sunil",
+    "name": "Samson",
     "phone": "+15550000218",
     "status": "AVAILABLE",
     "availableFrom": "08:30",
